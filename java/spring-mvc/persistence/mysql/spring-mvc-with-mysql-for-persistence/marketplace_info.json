@@ -8,8 +8,6 @@
         "mysql",
         "persistence"
     ],
-    "templateRepo": "https://github.com/devashish234073/cloud-pc-templates-marketplace",
-    "templateDirectory": "java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence",
-    "templateName": "spring-mvc-with-mysql-for-persistence.yaml",
-    "marketplace_softwarelist": "marketplace_softwarelist.json"
+    "templateUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence/spring-mvc-with-mysql-for-persistence.yaml",
+    "marketplace_softwarelistUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence/marketplace_softwarelist.json"
 }
