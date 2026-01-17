@@ -1,0 +1,15 @@
+{
+    "name": "spring-mvc-with-mysql-for-persistence",
+    "repo": "https://github.com/devashish234073/cloud-pc-templates-marketplace",
+    "directory": "java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence",
+    "description": "Spring MVC with MySQL for persistence",
+    "tags": [
+        "spring-mvc",
+        "mysql",
+        "persistence"
+    ],
+    "templateRepo": "https://github.com/devashish234073/cloud-pc-templates-marketplace",
+    "templateDirectory": "java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence",
+    "templateName": "spring-mvc-with-mysql-for-persistence.yaml",
+    "marketplace_softwarelist": "marketplace_softwarelist.json"
+}
