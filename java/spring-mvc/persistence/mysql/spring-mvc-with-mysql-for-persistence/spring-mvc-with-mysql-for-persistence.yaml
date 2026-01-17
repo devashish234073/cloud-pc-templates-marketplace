@@ -107,6 +107,13 @@ Resources:
           </html>
           EOF
           systemctl enable apache2
+          
+          # Clone repository and setup symlink
+          cd /home/ubuntu/Desktop
+          git clone https://github.com/devashish234073/cloud-pc-templates-marketplace
+          ln -s /home/ubuntu/Desktop/cloud-pc-templates-marketplace/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
+          chown -R ubuntu:ubuntu /home/ubuntu/Desktop/cloud-pc-templates-marketplace
+          chown -h ubuntu:ubuntu /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
       NetworkInterfaces:
         - DeviceIndex: 0
           AssociatePublicIpAddress: true

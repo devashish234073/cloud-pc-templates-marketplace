@@ -1,8 +1,11 @@
 {
-    "java": [
-        "8"
-    ],
-    "mysql": [
-        "8.0"
-    ]
+    "softwares": {
+        "java": [
+            "8"
+        ],
+        "mysql": [
+            "8.0"
+        ]
+    },
+    "endScript": "cd /home/ubuntu/Desktop\ngit clone https://github.com/devashish234073/cloud-pc-templates-marketplace\nln -s /home/ubuntu/Desktop/cloud-pc-templates-marketplace/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence\nchown -R ubuntu:ubuntu /home/ubuntu/Desktop/cloud-pc-templates-marketplace\nchown -h ubuntu:ubuntu /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence"
 }
