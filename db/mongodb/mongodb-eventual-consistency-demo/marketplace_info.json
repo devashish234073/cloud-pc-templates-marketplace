@@ -1,0 +1,11 @@
+{
+    "name": "mongodb-eventual-consistency-demo",
+    "repo": "https://github.com/devashish234073/cloud-pc-templates-marketplace",
+    "directory": "db/mongodb/mongodb-eventual-consistency-demo",
+    "description": "MongoDB Eventual Consistency Demo",
+    "tags": [
+        "mongodb",
+        "eventual-consistency"
+    ],
+    "templateUrl": "https://raw.githubusercontent.com/devashish234073/db-experiments/refs/heads/main/mongodb-eventual-consistency-demo/mongodb-eventual-consistency-demo.yml"
+}
