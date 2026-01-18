@@ -3,18 +3,47 @@ set -e
 
 # Configuration
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-TOMCAT_HOME=~/apache-tomcat-9.0.113
-PROJECT_DIR=~/new/cloud-pc-templates/java-web
+TOMCAT_VERSION="9.0.85"
+TOMCAT_HOME="$HOME/apache-tomcat-$TOMCAT_VERSION"
+PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 export JAVA_HOME
 
-echo "Using JAVA_HOME: $JAVA_HOME"
-chmod +x $TOMCAT_HOME/bin/*.sh
+# 0. Install Prerequisites
+echo "Checking prerequisites..."
 
+# Install Maven
+if ! command -v mvn &> /dev/null; then
+    echo "Maven not found. Installing..."
+    sudo apt-get update
+    sudo apt-get install -y maven
+else
+    echo "Maven is already installed."
+fi
+
+# Install Tomcat
+if [ ! -d "$TOMCAT_HOME" ]; then
+    echo "Tomcat not found at $TOMCAT_HOME. Installing..."
+    cd "$HOME"
+    if [ ! -f "apache-tomcat-$TOMCAT_VERSION.tar.gz" ]; then
+        wget -q "https://archive.apache.org/dist/tomcat/tomcat-9/v$TOMCAT_VERSION/bin/apache-tomcat-$TOMCAT_VERSION.tar.gz"
+    fi
+    tar -xzf "apache-tomcat-$TOMCAT_VERSION.tar.gz"
+    rm "apache-tomcat-$TOMCAT_VERSION.tar.gz"
+    cd "$PROJECT_DIR"
+else
+    echo "Tomcat found at $TOMCAT_HOME"
+fi
+
+echo "Using JAVA_HOME: $JAVA_HOME"
+echo "Using TOMCAT_HOME: $TOMCAT_HOME"
+echo "Using PROJECT_DIR: $PROJECT_DIR"
+chmod +x $TOMCAT_HOME/bin/*.sh
 
 # 1. Build
 cd $PROJECT_DIR
 echo "Building project..."
-mvn clean package -DskipTests
+mvn clean package war:exploded -DskipTests
 
 # 2. Copy MySQL Driver to Tomcat Lib (Required for JNDI)
 echo "Copying MySQL driver to Tomcat lib..."

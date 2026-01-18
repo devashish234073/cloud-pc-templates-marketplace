@@ -67,8 +67,15 @@ Resources:
           </body>
           </html>
           EOF
-          # Install Java 8 (OpenJDK)
-          apt install -y openjdk-8-jdk
+          # Install Java 8 (OpenJDK) and Maven
+          apt install -y openjdk-8-jdk maven
+
+          # Install Tomcat 9
+          cd /home/ubuntu
+          wget -q https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.85/bin/apache-tomcat-9.0.85.tar.gz
+          tar -xzf apache-tomcat-9.0.85.tar.gz
+          rm apache-tomcat-9.0.85.tar.gz
+          chown -R ubuntu:ubuntu apache-tomcat-9.0.85
           
           # Install MySQL
           apt-get update
@@ -101,6 +108,8 @@ Resources:
           <h2>Installed Software</h2>
           <ul>
           <li>Java JDK (8)  </li>
+          <li>Maven </li>
+          <li>Tomcat (9) </li>
           <li>MySQL (8.0)  - <small>to launch mysql use this with password root 'mysql -u root -p'</small> </li>
           </ul>
           </body>
@@ -116,6 +125,10 @@ Resources:
           ln -s /home/ubuntu/Desktop/cloud-pc-templates-marketplace/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
           chown -R ubuntu:ubuntu /home/ubuntu/Desktop/cloud-pc-templates-marketplace
           chown -h ubuntu:ubuntu /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
+          
+          # Build Project
+          cd /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
+          mvn install
       NetworkInterfaces:
         - DeviceIndex: 0
           AssociatePublicIpAddress: true
