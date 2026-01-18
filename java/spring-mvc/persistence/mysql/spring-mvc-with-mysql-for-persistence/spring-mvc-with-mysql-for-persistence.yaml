@@ -109,6 +109,8 @@ Resources:
           systemctl enable apache2
           
           # Clone repository and setup symlink
+          mkdir -p /home/ubuntu/Desktop
+          chown ubuntu:ubuntu /home/ubuntu/Desktop
           cd /home/ubuntu/Desktop
           git clone https://github.com/devashish234073/cloud-pc-templates-marketplace
           ln -s /home/ubuntu/Desktop/cloud-pc-templates-marketplace/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
