@@ -127,8 +127,9 @@ Resources:
           chown -h ubuntu:ubuntu /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
           
           # Build Project
-          cd /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
-          mvn install
+          # Build Project
+          chown -R ubuntu:ubuntu /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence
+          su - ubuntu -c "cd /home/ubuntu/Desktop/spring-mvc-with-mysql-for-persistence && mvn install"
       NetworkInterfaces:
         - DeviceIndex: 0
           AssociatePublicIpAddress: true
