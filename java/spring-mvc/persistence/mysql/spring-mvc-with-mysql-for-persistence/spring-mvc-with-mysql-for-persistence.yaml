@@ -28,16 +28,16 @@ Resources:
       MapPublicIpOnLaunch: true
       AvailabilityZone: ap-south-1b
 
-  ec2WithVnc:
+  ec2Instance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: ami-0ff91eb5c6fe7cc86
-      InstanceType: t3.large
+      InstanceType: t3.medium
       KeyName: !Ref KeyPairName
       BlockDeviceMappings:
       - DeviceName: /dev/sda1
         Ebs:
-          VolumeSize: 30
+          VolumeSize: 20
           VolumeType: gp3
           DeleteOnTermination: true
       UserData:
