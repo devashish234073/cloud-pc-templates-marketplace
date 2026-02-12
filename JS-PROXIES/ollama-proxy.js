@@ -177,6 +177,14 @@ function callOllamaChat(body, callback) {
 ========================================================= */
 
 const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        return res.end();
+    }
 
     /* -------- GET /v1/models -------- */
     if (req.method === 'GET' && req.url === '/v1/models') {
