@@ -5,6 +5,7 @@
         "port": 3030,
         "description": "Readonly agent for your files.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/fileExplorerConnector.js",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/fileExplorerConnector-API.md",
         "healthCheckUrl": "http://localhost:3030/health",
         "fileName": "fileExplorerConnector.txt"
     }
