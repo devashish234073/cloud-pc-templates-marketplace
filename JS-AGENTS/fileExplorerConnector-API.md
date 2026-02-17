@@ -10,7 +10,7 @@ GET /findFile?name=package.json&excludeFolder=node_modules
 Search by exact filename. Returns response like: {"count":1,"files":["/path/package.json"]}
 
 GET /searchText?text=hello&excludeFolder=node_modules
-Searches for text inside all readable (non-binary) files recursively. This does Case-insensitive search and returns response like: {
+Searches for text inside all readable (non-binary) files recursively. This does Case-insensitive search , to search text with space pass %20 instead of space and this api returns response like: {
   "search": "hello",
   "count": 2,
   "results": [

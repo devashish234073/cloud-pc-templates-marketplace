@@ -116,12 +116,24 @@ function findTextInFiles(dir, searchText, excludeFolders, results = []) {
                         const lines = content.split(/\r?\n/);
 
                         const matches = [];
+                        const lowerSearch = searchText.toLowerCase();
 
                         lines.forEach((line, index) => {
-                            if (line.toLowerCase().includes(searchText.toLowerCase())) {
+                            const lowerLine = line.toLowerCase();
+                            const foundIndex = lowerLine.indexOf(lowerSearch);
+
+                            if (foundIndex !== -1) {
+                                let resultLine = line;
+
+                                if (line.length > 70) {
+                                    const start = Math.max(0, foundIndex - 35);
+                                    const end = Math.min(line.length, foundIndex + lowerSearch.length + 35);
+                                    resultLine = line.substring(start, end);
+                                }
+
                                 matches.push({
                                     lineNumber: index + 1,
-                                    line: line
+                                    line: resultLine
                                 });
                             }
                         });
@@ -141,7 +153,6 @@ function findTextInFiles(dir, searchText, excludeFolders, results = []) {
 
     return results;
 }
-
 
 /* ------------------ SERVER ------------------ */
 
