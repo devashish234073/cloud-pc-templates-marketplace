@@ -27,10 +27,10 @@ console.log("Scanning Base Directory:", BASE_DIR);
 /* ------------------ BINARY EXTENSION FILTER ------------------ */
 
 const BLOCKED_EXTENSIONS = [
-    'pdf','doc','docx','ppt','pptx','xls','xlsx',
-    'png','jpg','jpeg','gif','bmp','webp',
-    'mp3','mp4','wav','avi','mkv','mov',
-    'exe','dll','bin','iso','zip','rar','7z'
+    'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx',
+    'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp',
+    'mp3', 'mp4', 'wav', 'avi', 'mkv', 'mov',
+    'exe', 'dll', 'bin', 'iso', 'zip', 'rar', '7z'
 ];
 
 function isBinaryFile(filePath) {
@@ -63,9 +63,9 @@ function findFilesByExtension(dir, extension, excludeFolders, results = []) {
                 } else if (file.toLowerCase().endsWith('.' + extension.toLowerCase())) {
                     results.push(fullPath);
                 }
-            } catch {}
+            } catch { }
         }
-    } catch {}
+    } catch { }
 
     return results;
 }
@@ -87,12 +87,61 @@ function findFileByExactName(dir, filename, excludeFolders, results = []) {
                 } else if (file === filename) {
                     results.push(fullPath);
                 }
-            } catch {}
+            } catch { }
         }
-    } catch {}
+    } catch { }
 
     return results;
 }
+
+function findTextInFiles(dir, searchText, excludeFolders, results = []) {
+    try {
+        const files = fs.readdirSync(dir);
+
+        for (const file of files) {
+            const fullPath = path.join(dir, file);
+
+            try {
+                const stat = fs.statSync(fullPath);
+
+                if (stat.isDirectory()) {
+                    if (!shouldExclude(file, excludeFolders)) {
+                        findTextInFiles(fullPath, searchText, excludeFolders, results);
+                    }
+                } else {
+                    if (isBinaryFile(fullPath)) continue;
+
+                    try {
+                        const content = fs.readFileSync(fullPath, 'utf8');
+                        const lines = content.split(/\r?\n/);
+
+                        const matches = [];
+
+                        lines.forEach((line, index) => {
+                            if (line.toLowerCase().includes(searchText.toLowerCase())) {
+                                matches.push({
+                                    lineNumber: index + 1,
+                                    line: line
+                                });
+                            }
+                        });
+
+                        if (matches.length > 0) {
+                            results.push({
+                                file: fullPath,
+                                matches: matches
+                            });
+                        }
+
+                    } catch { }
+                }
+            } catch { }
+        }
+    } catch { }
+
+    return results;
+}
+
 
 /* ------------------ SERVER ------------------ */
 
@@ -141,6 +190,40 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: err.message }));
         }
     }
+
+    /* -------- SEARCH TEXT -------- */
+    if (parsedUrl.pathname === '/searchText') {
+        const { text, excludeFolder } = parsedUrl.query;
+
+        let excludeFolders = [];
+        if (excludeFolder) {
+            excludeFolders = excludeFolder
+                .split(',')
+                .map(f => f.trim().toLowerCase());
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+
+        if (!text) {
+            return res.end(JSON.stringify({
+                error: "Provide ?text=yourSearchText"
+            }));
+        }
+
+        try {
+            const results = findTextInFiles(BASE_DIR, text, excludeFolders);
+
+            return res.end(JSON.stringify({
+                search: text,
+                count: results.length,
+                results: results
+            }));
+        } catch (err) {
+            res.writeHead(500);
+            return res.end(JSON.stringify({ error: err.message }));
+        }
+    }
+
 
     /* -------- READ FILE (NEW) -------- */
     if (parsedUrl.pathname === '/readFile') {
