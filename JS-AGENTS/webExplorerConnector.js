@@ -57,6 +57,13 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204); // No content
+        return res.end();
+    }
+
     const parsedUrl = url.parse(req.url, true);
 
     /* -------- HEALTH -------- */
