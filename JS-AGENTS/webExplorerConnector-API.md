@@ -1,4 +1,4 @@
-WEB SEARCH API (http://localhost:3006)
+WEB SEARCH API (http://localhost:3031)
 
 GET /search?q=your_query_here
 Performs a web search using DuckDuckGo (HTML endpoint) and returns top 5 results.
