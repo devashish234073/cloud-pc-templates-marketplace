@@ -1,6 +1,7 @@
 const http = require("http");
 const https = require("https");
 const { URL } = require("url");
+const url = require('url');
 const PORT = 3031;
 
 /**
@@ -56,6 +57,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+    const parsedUrl = url.parse(req.url, true);
 
     /* -------- HEALTH -------- */
     if (parsedUrl.pathname === '/health') {
