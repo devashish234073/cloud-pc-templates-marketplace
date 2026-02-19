@@ -28,6 +28,24 @@ function fetch(url) {
     });
 }
 
+function decodeUrl(redirectUrl) {
+  try {
+    // Add protocol if missing (for URLs starting with //)
+    if (redirectUrl.startsWith("//")) {
+      redirectUrl = "https:" + redirectUrl;
+    }
+
+    const url = new URL(redirectUrl);
+    const encodedTarget = url.searchParams.get("uddg");
+
+    if (!encodedTarget) return null;
+
+    return decodeURIComponent(encodedTarget);
+  } catch (error) {
+    return null;
+  }
+}
+
 /**
  * Extract search results from DuckDuckGo HTML
  */
@@ -37,7 +55,7 @@ function extractResults(html) {
 
     let match;
     while ((match = regex.exec(html)) !== null && results.length < 5) {
-        const url = match[1];
+        const url = decodeUrl(match[1]);
         const title = match[2]
             .replace(/<[^>]+>/g, "")
             .replace(/&[^;]+;/g, "")
