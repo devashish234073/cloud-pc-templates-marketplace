@@ -122,6 +122,25 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
+const message = `
+╔══════════════════════════════════════════════════════════════╗
+║               ⚠️  IMPORTANT INFO  ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                              ║
+║  🚫 Scraping websites without permission is NOT ethical.     ║
+║                                                              ║
+║  This is only for demo we discourage misuse and highlight    ║
+║      responsible API usage.                                  ║
+║  ✅ What you should do instead:                             ║
+║     • Use official search APIs (Google, Bing, Brave, etc.)  ║
+║     • Respect robots.txt and websites' Terms of Service      ║
+║     • Always attribute data sources properly                 ║
+║                                                              ║
+║  📚 This is a DEMO application for learning purposes only.  ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+  `;
+
 server.listen(PORT, () => {
-    console.log(`Web Search API running on http://localhost:${PORT}`);
+    console.log(`Web Search API running on http://localhost:${PORT}\n${message}`);
 });
