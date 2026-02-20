@@ -10,6 +10,16 @@
         "fileName": "fileExplorerConnector.txt"
     },
     {
+        "id": "tools-explorer",
+        "name": "TOols Explorer",
+        "port": 3032,
+        "description": "provides apis that can be called to get the version of various tools, like java,maven,node,npm,python,etc.",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/toolsExplorerConnector.js",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/toolsExplorerConnector-API.md",
+        "healthCheckUrl": "http://localhost:3032/health",
+        "fileName": "toolsExplorerConnector.txt"
+    },
+    {
         "id": "web-explorer",
         "name": "Web Explorer",
         "port": 3031,
