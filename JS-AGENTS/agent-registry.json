@@ -23,7 +23,7 @@
         "id": "git-explorer",
         "name": "GIt Explorer",
         "port": 3033,
-        "description": "rovides APIs to manage and explore Git repositories. It allows cloning repositories into a specified base folder, listing detected repositories, and searching source code by file name or content.",
+        "description": "provides APIs to manage and explore Git repositories. It allows cloning repositories into a specified base folder, listing detected repositories, and searching source code by file name or content.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/gitExplorerConnector.js",
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/gitExplorerConnector-API.md",
         "healthCheckUrl": "http://localhost:3033/health",
