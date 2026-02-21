@@ -10,6 +10,23 @@ const PORT = 3033;
 
 let BASE_DIR;
 
+/* ------------------ FOLDER EXCLUSIONS ------------------ */
+
+const EXCLUDED_FOLDERS = ['node_modules', 'target'];
+
+function shouldExcludeFolder(folderName) {
+    if (folderName.indexOf(".") == 0) {
+        //console.log(`${folderName} excluded..`);
+        return true;
+    }
+    if (EXCLUDED_FOLDERS.includes(folderName.toLowerCase())) {
+        //console.log(`${folderName} excluded...`);
+        return true;
+    }
+    //console.log(`including folder ${folderName}`);
+    return false;
+}
+
 if (process.argv[2]) {
     const inputPath = path.resolve(process.argv[2]);
 
@@ -76,20 +93,31 @@ function scanRepos() {
 
     const folders = fs.readdirSync(BASE_DIR);
 
+    let countExc = 0;
+    let countInc = 0;
     for (const folder of folders) {
+        if (shouldExcludeFolder(folder)) {
+            countExc++;
+            continue;
+        }
         const fullPath = path.join(BASE_DIR, folder);
         const gitPath = path.join(fullPath, '.git');
 
         try {
-            if (!shouldExcludeFolder(folder) && fs.statSync(fullPath).isDirectory() && fs.existsSync(gitPath)) {
+            if (fs.statSync(fullPath).isDirectory() && fs.existsSync(gitPath)) {
                 repos.push({
                     name: folder,
                     path: fullPath
                 });
+                countInc++;
+            } else {
+                countExc++;
             }
-        } catch { }
+        } catch {
+            countExc++;
+        }
     }
-    console.log("found repos", repos);
+    console.log(`scanned ${countInc + countExc} folders, ${countExc} excluded} found repos`, repos);
 }
 
 scanRepos();
@@ -130,15 +158,6 @@ const BLOCKED_EXTENSIONS = [
 function isBinary(filePath) {
     const ext = path.extname(filePath).replace('.', '').toLowerCase();
     return BLOCKED_EXTENSIONS.includes(ext);
-}
-
-/* ------------------ FOLDER EXCLUSIONS ------------------ */
-
-const EXCLUDED_FOLDERS = ['node_modules', 'target'];
-
-function shouldExcludeFolder(folderName) {
-    if (folderName.indexOf(".") == 0) return true;
-    return EXCLUDED_FOLDERS.includes(folderName.toLowerCase());
 }
 
 /* ------------------ SAFE WALK ------------------ */
