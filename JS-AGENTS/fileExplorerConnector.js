@@ -19,7 +19,7 @@ if (process.argv[2]) {
 
     BASE_DIR = inputPath;
 } else {
-    BASE_DIR = process.platform === 'win32' ? 'C:\\' : '/';
+    BASE_DIR = process.cwd(); // current working directory
 }
 
 console.log("Scanning Base Directory:", BASE_DIR);
