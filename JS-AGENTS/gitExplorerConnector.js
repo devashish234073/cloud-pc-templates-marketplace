@@ -36,6 +36,36 @@ if (!fs.statSync(BASE_DIR).isDirectory()) {
 
 console.log("Git Explorer Base Directory:", BASE_DIR);
 
+function getFilesContentByNames(fileNames) {
+    const result = {};
+    fileNames.forEach(name => {
+        result[name] = [];
+    });
+
+    repos.forEach(repo => {
+        walkDir(repo.path, (file) => {
+            const base = path.basename(file);
+
+            if (fileNames.includes(base)) {
+
+                if (isBinary(file)) return;
+
+                try {
+                    const content = fs.readFileSync(file, 'utf8');
+
+                    result[base].push({
+                        path: file,
+                        content: content
+                    });
+
+                } catch { }
+            }
+        });
+    });
+
+    return result;
+}
+
 /* ------------------ REPO LIST ------------------ */
 
 let repos = [];
@@ -59,7 +89,7 @@ function scanRepos() {
             }
         } catch { }
     }
-    console.log("found repos",repos);
+    console.log("found repos", repos);
 }
 
 scanRepos();
@@ -93,8 +123,8 @@ function cloneRepo(repoUrl) {
 /* ------------------ SEARCH HELPERS ------------------ */
 
 const BLOCKED_EXTENSIONS = [
-    'png','jpg','jpeg','gif','bmp','webp',
-    'mp3','mp4','exe','dll','zip','rar','7z'
+    'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp',
+    'mp3', 'mp4', 'exe', 'dll', 'zip', 'rar', '7z'
 ];
 
 function isBinary(filePath) {
@@ -107,7 +137,7 @@ function isBinary(filePath) {
 const EXCLUDED_FOLDERS = ['node_modules', 'target'];
 
 function shouldExcludeFolder(folderName) {
-    if(folderName.indexOf(".")==0) return true;
+    if (folderName.indexOf(".") == 0) return true;
     return EXCLUDED_FOLDERS.includes(folderName.toLowerCase());
 }
 
@@ -297,6 +327,41 @@ const server = http.createServer(async (req, res) => {
             count: results.length,
             files: results
         }));
+    }
+
+    if (parsedUrl.pathname === '/getFilesContent' && req.method === 'POST') {
+        let body = '';
+
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+
+        req.on('end', () => {
+
+            try {
+                const fileNames = JSON.parse(body);
+
+                if (!Array.isArray(fileNames) || fileNames.length === 0) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({
+                        error: "Payload must be a non-empty array of file names"
+                    }));
+                }
+
+                const result = getFilesContentByNames(fileNames);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify(result));
+
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({
+                    error: "Invalid JSON payload"
+                }));
+            }
+        });
+
+        return;
     }
 
     /* FIND CONTENT */
