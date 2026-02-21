@@ -81,7 +81,7 @@ function scanRepos() {
         const gitPath = path.join(fullPath, '.git');
 
         try {
-            if (fs.statSync(fullPath).isDirectory() && fs.existsSync(gitPath)) {
+            if (!shouldExcludeFolder(folder) && fs.statSync(fullPath).isDirectory() && fs.existsSync(gitPath)) {
                 repos.push({
                     name: folder,
                     path: fullPath
