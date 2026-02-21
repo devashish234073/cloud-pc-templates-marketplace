@@ -8,12 +8,22 @@ const PORT = 3033;
 
 /* ------------------ BASE FOLDER FROM CLI ------------------ */
 
-if (!process.argv[2]) {
-    console.error("Usage: node git-explorer.js <foldername>");
-    process.exit(1);
+let BASE_DIR;
+
+if (process.argv[2]) {
+    const inputPath = path.resolve(process.argv[2]);
+
+    if (!fs.existsSync(inputPath) || !fs.statSync(inputPath).isDirectory()) {
+        console.error("Invalid directory provided:", inputPath);
+        process.exit(1);
+    }
+
+    BASE_DIR = inputPath;
+} else {
+    BASE_DIR = process.cwd(); // current working directory
 }
 
-const BASE_DIR = path.resolve(process.argv[2]);
+console.log("Scanning Base Directory:", BASE_DIR);
 
 if (!fs.existsSync(BASE_DIR)) {
     fs.mkdirSync(BASE_DIR, { recursive: true });
