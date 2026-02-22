@@ -25,12 +25,6 @@ GET http://localhost:3033/clone?url=https://github.com/user/repo.git
 Response (Success) will look like:
 {"message":"Repository cloned successfully","repo":"repo"}
 
-Response (Already Exists):
-{"error":"Repository already exists"}
-
-Response (Clone Error):
-{"error":"fatal: repository not found"}
-
 To Find a File across repos using git explorer agent By Exact Name call
 
 GET http://localhost:3033/findByFileName?name=package.json
@@ -62,24 +56,3 @@ Request Payload (raw JSON array):
 
 Response will look like:
 {"test.js":[{"path":"C:\repos\repo1\test.js","content":"console.log('hello');"},{"path":"C:\repos\repo2\src\test.js","content":"export default function(){}"}],"config.js":[{"path":"C:\repos\repo1\config.js","content":"module.exports = {};"}]}
-
-If a file name is not found, it will return empty array for that file:
-{"unknown.js":[]}
-
-Automatic Folder Exclusions
-The following folders are automatically excluded from scanning:
-
-Any folder starting with a dot (example: .git, .idea, .vscode)
-
-node_modules
-
-target
-
-Error Response (Missing Parameters Example)
-{"error":"Provide required query parameter"}
-
-Invalid JSON Payload Example (For POST)
-{"error":"Invalid JSON payload"}
-
-404 Response
-{"error":"Not Found"}
