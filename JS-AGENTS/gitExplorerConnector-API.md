@@ -1,4 +1,4 @@
-GitExplorer: This tool provides APIs to manage and explore Git repositories. It allows cloning repositories into a specified base folder, listing detected repositories, searching source code by file name or content, and retrieving content of multiple files in a single request.
+GitExplorer: This tool provides APIs to manage and explore Git repositories. It allows cloning repositories into a specified base folder, listing detected repositories, searching source code by file name or content, and retrieving content of multiple files in a single request. Note: for searching or reading files from the repo expect the paths to look like localfile system as this api let's you explore the files from cloned repo.
 
 Server Port
 All APIs run on:
