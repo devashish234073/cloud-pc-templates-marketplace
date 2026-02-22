@@ -284,7 +284,7 @@ function findTextInFilesInGitRepo(text) {
 const server = http.createServer(async (req, res) => {
 
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS', 'POST');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     const parsedUrl = url.parse(req.url, true);
