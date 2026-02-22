@@ -27,21 +27,14 @@ Response (Success) will look like:
 
 To Find a File across repos using git explorer agent By Exact Name call
 
-GET http://localhost:3033/findByFileName?name=package.json
+GET http://localhost:3033/getFileInRepoByName?name=package.json
 
 Response will look like:
 {"count":2,"files":["C:\repos\repo1\package.json","C:\repos\repo2\package.json"]}
 
-To Find File in repositories using git explorer agent By Partial Name call
-
-GET http://localhost:3033/findByPartialFileName?name=service
-
-Response will look like:
-{"count":4,"files":["C:\repos\repo1\src\userService.js","C:\repos\repo2\src\paymentService.js"]}
-
 To Search By File Content using git explorer agent call
 
-GET http://localhost:3033/findByContent?text=database
+GET http://localhost:3033/findTextInFilesInGitRepo?text=database
  connection
 
 Response will look like:
@@ -49,7 +42,7 @@ Response will look like:
 
 To Retrieve Content of Multiple Files using git explorer agent call
 
-POST http://localhost:3033/getFilesContent
+POST http://localhost:3033/readFilesContentInGitRepo
 
 Request Payload (raw JSON array):
 ["test.js","config.js"]

@@ -31,33 +31,7 @@ Returns response like:
   ]
 }
 
-
-Error Responses
-
-Missing query parameter:
-
-{
-  "error": "Missing query parameter 'q'"
-}
-
-
-Invalid endpoint:
-
-{
-  "error": "Not Found"
-}
-
-
-Server error (upstream issue / network issue):
-
-{
-  "error": "error message"
-}
-
 Behavior Notes
 Returns maximum 5 results.
 Scrapes DuckDuckGo HTML search results.
 Uses basic HTML parsing (no official API).
-Requires internet connectivity.
-Heavy usage may result in rate limiting by search provider.
-Response time depends on upstream search response.

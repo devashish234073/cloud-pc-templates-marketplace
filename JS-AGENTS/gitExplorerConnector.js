@@ -53,7 +53,7 @@ if (!fs.statSync(BASE_DIR).isDirectory()) {
 
 console.log("Git Explorer Base Directory:", BASE_DIR);
 
-function getFilesContentByNames(fileNames) {
+function readFilesContentInGitRepoByNames(fileNames) {
     const result = {};
     fileNames.forEach(name => {
         result[name] = [];
@@ -188,7 +188,7 @@ function walkDir(dir, callback) {
 }
 
 /* Exact file name */
-function findByFileName(name) {
+function getFileInRepoByName(name) {
     const results = [];
 
     repos.forEach(repo => {
@@ -219,7 +219,7 @@ function findByPartialFileName(name) {
 }
 
 /* Search by content */
-function findByContent(text) {
+function findTextInFilesInGitRepo(text) {
     const results = [];
     const lowerSearch = text.toLowerCase();
 
@@ -313,7 +313,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* FIND EXACT */
-    if (parsedUrl.pathname === '/findByFileName') {
+    if (parsedUrl.pathname === '/getFileInRepoByName') {
         const { name } = parsedUrl.query;
 
         if (!name) {
@@ -321,7 +321,7 @@ const server = http.createServer(async (req, res) => {
             return res.end(JSON.stringify({ error: "Provide ?name=filename" }));
         }
 
-        const results = findByFileName(name);
+        const results = getFileInRepoByName(name);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({
@@ -348,7 +348,7 @@ const server = http.createServer(async (req, res) => {
         }));
     }
 
-    if (parsedUrl.pathname === '/getFilesContent' && req.method === 'POST') {
+    if (parsedUrl.pathname === '/readFilesContentInGitRepo' && req.method === 'POST') {
         let body = '';
 
         req.on('data', chunk => {
@@ -367,7 +367,7 @@ const server = http.createServer(async (req, res) => {
                     }));
                 }
 
-                const result = getFilesContentByNames(fileNames);
+                const result = readFilesContentInGitRepoByNames(fileNames);
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 return res.end(JSON.stringify(result));
@@ -384,7 +384,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* FIND CONTENT */
-    if (parsedUrl.pathname === '/findByContent') {
+    if (parsedUrl.pathname === '/findTextInFilesInGitRepo') {
         const { text } = parsedUrl.query;
 
         if (!text) {
@@ -392,7 +392,7 @@ const server = http.createServer(async (req, res) => {
             return res.end(JSON.stringify({ error: "Provide ?text=searchText" }));
         }
 
-        const results = findByContent(text);
+        const results = findTextInFilesInGitRepo(text);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({
