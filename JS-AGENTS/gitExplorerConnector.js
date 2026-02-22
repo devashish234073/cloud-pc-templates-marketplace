@@ -59,27 +59,40 @@ function readFilesContentInGitRepoByNames(fileNames) {
         result[name] = [];
     });
 
-    repos.forEach(repo => {
-        walkDir(repo.path, (file) => {
-            const base = path.basename(file);
-
-            if (fileNames.includes(base)) {
-
-                if (isBinary(file)) return;
-
+    fileNames.forEach(name => {
+        const isPathInput = name.includes(path.sep) || path.isAbsolute(name);
+        // CASE 1: Specific file path passed
+        if (isPathInput) {
+            if (fs.existsSync(name) && fs.statSync(name).isFile()) {
+                if (isBinary(name)) return;
                 try {
-                    const content = fs.readFileSync(file, 'utf8');
-
-                    result[base].push({
-                        path: file,
+                    const content = fs.readFileSync(name, 'utf8');
+                    result[name].push({
+                        path: name,
                         content: content
                     });
-
                 } catch { }
             }
-        });
+        }
+        // CASE 2: Only file name passed (existing behavior)
+        else {
+            repos.forEach(repo => {
+                walkDir(repo.path, (file) => {
+                    const base = path.basename(file);
+                    if (base === name) {
+                        if (isBinary(file)) return;
+                        try {
+                            const content = fs.readFileSync(file, 'utf8');
+                            result[name].push({
+                                path: file,
+                                content: content
+                            });
+                        } catch { }
+                    }
+                });
+            });
+        }
     });
-
     return result;
 }
 
