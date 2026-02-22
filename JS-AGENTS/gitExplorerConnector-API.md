@@ -45,7 +45,9 @@ To Retrieve Content of Multiple Files using git explorer agent call
 POST http://localhost:3033/readFilesContentInGitRepo
 
 Request Payload (raw JSON array):
-["test.js","config.js"]
+["test.js","config.js","/home/user/test.txt"]
+
+the payload array contain filename or filePath both mode works
 
 Response will look like:
 {"test.js":[{"path":"C:\repos\repo1\test.js","content":"console.log('hello');"},{"path":"C:\repos\repo2\src\test.js","content":"export default function(){}"}],"config.js":[{"path":"C:\repos\repo1\config.js","content":"module.exports = {};"}]}
