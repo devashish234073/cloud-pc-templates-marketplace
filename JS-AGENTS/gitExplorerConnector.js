@@ -287,6 +287,12 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204); // No content
+        return res.end();
+    }
+
     const parsedUrl = url.parse(req.url, true);
 
     /* HEALTH */
