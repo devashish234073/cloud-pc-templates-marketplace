@@ -9,6 +9,6 @@
         "ollama",
         "chrome"
     ],
-    "templateUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence/spring-mvc-with-mysql-for-persistence.yaml",
+    "templateUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/cloud-pc-templates/cloud-pc-templates.yaml",
     "marketplace_softwarelistUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/cloud-pc-templates/marketplace_softwarelist.json"
 }
