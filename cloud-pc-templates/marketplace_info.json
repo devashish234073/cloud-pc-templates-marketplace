@@ -1,0 +1,14 @@
+{
+    "name": "cloud-pc-templates",
+    "repo": "https://github.com/devashish234073/cloud-pc-templates-marketplace",
+    "directory": "cloud-pc-templates",
+    "description": "Sets up coud pc template in aws",
+    "tags": [
+        "cloud-pc-templates",
+        "nodejs",
+        "ollama",
+        "chrome"
+    ],
+    "templateUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence/spring-mvc-with-mysql-for-persistence.yaml",
+    "marketplace_softwarelistUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/java/spring-mvc/persistence/mysql/spring-mvc-with-mysql-for-persistence/marketplace_softwarelist.json"
+}
