@@ -1,10 +1,10 @@
 {
     "softwares": {
-        "nodejs": [
-            "24"
+        "node": [
+            "22.x"
         ],
-        "chrome": [
-            "latest"
+        "google-chrome": [
+            "Stable"
         ],
         "ollama": [
             "latest"
