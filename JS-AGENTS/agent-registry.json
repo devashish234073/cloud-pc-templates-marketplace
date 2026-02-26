@@ -38,5 +38,15 @@
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/webExplorerConnector-API.md",
         "healthCheckUrl": "http://localhost:3031/health",
         "fileName": "webExplorerConnector.txt"
+    },
+    {
+        "id": "angular connector",
+        "name": "Angular Connector",
+        "port": 3034,
+        "description": "provides APIs to create angular component and register routes or check logs after running that.",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector.js",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector-API.md",
+        "healthCheckUrl": "http://localhost:3034/health",
+        "fileName": "angularConnector.txt"
     }
 ]
