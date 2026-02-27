@@ -37,6 +37,8 @@ Response (success):
   "errors": []   // only present if individual file writes failed
 }
 
+if myHeader route is created the app can be accessed from http://localhost:4200/myHeader
+
 Response (route skipped):
 {
   "message": "Component 'my-header' created successfully",
