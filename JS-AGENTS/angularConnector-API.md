@@ -65,6 +65,7 @@ Behavior notes:
 - templateUrl and styleUrl values inside the ts payload are automatically rewritten to match the actual generated filenames (Angular 19+ drops .component. from filenames)
 - A route is auto-registered after generation: kebab name is converted to camelCase for the route path (my-header -> myHeader) and PascalCase for the component class (MyHeaderComponent)
 - If route already exists, component creation still succeeds; route result will have skipped:true
+- Response includes a `logs` attribute containing the last 20 lines of the Angular dev server log
 
 Sample Response (success):
 {
@@ -72,7 +73,12 @@ Sample Response (success):
   "componentDir": "/project/src/app/my-header",
   "filesWritten": ["/project/src/app/my-header/my-header.ts", "..."],
   "route": { "path": "myHeader", "component": "MyHeaderComponent", "urlToTest": "http://localhost:4200/myHeader" },
-  "errors": []   // only present if individual file writes failed
+  "errors": [],   // only present if individual file writes failed
+  "logs": {
+    "logFile": "angular-dev-2026-02-28_10-00-00.log",
+    "totalLines": 142,
+    "lines": ["[STDOUT] Angular is running...", "[STDERR] Warning: ...", "..."]
+  }
 }
 
 if myHeader route is created the app can be accessed from http://localhost:4200/myHeader
@@ -82,7 +88,12 @@ Sample Response (route skipped):
   "message": "Component 'my-header' created successfully",
   "componentDir": "/project/src/app/my-header",
   "filesWritten": [...],
-  "route": { "skipped": true, "reason": "Route 'myHeader' already exists in routes file" }
+  "route": { "skipped": true, "reason": "Route 'myHeader' already exists in routes file" },
+  "logs": {
+    "logFile": "angular-dev-2026-02-28_10-00-00.log",
+    "totalLines": 142,
+    "lines": [...]
+  }
 }
 
 Sample Response (ng generate failed, 500):
@@ -109,13 +120,19 @@ Behavior notes:
 - templateUrl and styleUrl values inside the ts payload are automatically rewritten to match the actual existing filenames
 - Supports both Angular naming conventions: .component.ts and .ts, .component.html and .html, etc.
 - At least one file (ts, html, or css) must be provided for the update to succeed
+- Response includes a `logs` attribute containing the last 20 lines of the Angular dev server log
 
 Sample Response (success):
 {
   "message": "Component 'my-header' updated successfully",
   "componentDir": "/project/src/app/my-header",
   "filesUpdated": ["/project/src/app/my-header/my-header.ts", "/project/src/app/my-header/my-header.html"],
-  "filesNotUpdated": []  // only present if some files had write errors
+  "filesNotUpdated": [],  // only present if some files had write errors
+  "logs": {
+    "logFile": "angular-dev-2026-02-28_10-00-00.log",
+    "totalLines": 142,
+    "lines": ["[STDOUT] Angular is running...", "[STDERR] Warning: ...", "..."]
+  }
 }
 
 Sample Response (component not found, 404):

@@ -248,6 +248,28 @@ function toKebabCase(name) {
         .toLowerCase();
 }
 
+/* ------------------ GET LOGS HELPER ------------------ */
+
+function getLogs() {
+    try {
+        if (!fs.existsSync(LOG_FILE_PATH)) {
+            return { logFile: LOG_FILE_PATH, lines: [], totalLines: 0 };
+        }
+
+        const content = fs.readFileSync(LOG_FILE_PATH, 'utf8');
+        const lines = content.split(/\r?\n/).filter(l => l.trim() !== '');
+        const last20 = lines.slice(-20);
+
+        return {
+            logFile: LOG_FILE_PATH,
+            totalLines: lines.length,
+            lines: last20
+        };
+    } catch (e) {
+        return { logFile: LOG_FILE_PATH, lines: [], totalLines: 0, error: e.message };
+    }
+}
+
 /* ------------------ ADD ROUTE HELPER ------------------ */
 
 function addRouteToFile(cleanRoute, cleanComponent, componentDir) {
@@ -643,7 +665,8 @@ const server = http.createServer(async (req, res) => {
             route: routeResult && routeResult.success
                 ? { path: routeResult.path, component: routeResult.component, urlToTest: `http://localhost/${routeResult.path}` }
                 : { skipped: true, reason: routeResult ? routeResult.error : 'No routes file found' },
-            errors: errors.length ? errors : undefined
+            errors: errors.length ? errors : undefined,
+            logs: getLogs()
         });
     }
 
@@ -783,7 +806,8 @@ const server = http.createServer(async (req, res) => {
             message: `Component '${safeName}' updated successfully`,
             componentDir,
             filesUpdated: written,
-            filesNotUpdated: errors.length ? errors : undefined
+            filesNotUpdated: errors.length ? errors : undefined,
+            logs: getLogs()
         });
     }
 
