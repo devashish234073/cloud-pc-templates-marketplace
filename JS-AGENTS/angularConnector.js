@@ -349,6 +349,115 @@ const server = http.createServer(async (req, res) => {
         });
     }
 
+    /* -------- 0. GET COMPONENT FILES (POST /component/get) -------- */
+    if (parsedUrl.pathname === '/component/get') {
+        let body;
+        try {
+            body = await readBody(req);
+        } catch (e) {
+            return respond(400, { error: e.message });
+        }
+
+        const { componentName, fileTypes = ['ts', 'html', 'css'] } = body;
+
+        if (!componentName || typeof componentName !== 'string' || !componentName.trim()) {
+            return respond(400, { error: 'componentName is required' });
+        }
+
+        // Validate fileTypes
+        if (!Array.isArray(fileTypes)) {
+            return respond(400, { error: 'fileTypes must be an array' });
+        }
+        const validTypes = ['ts', 'html', 'css'];
+        for (const fileType of fileTypes) {
+            if (!validTypes.includes(fileType)) {
+                return respond(400, { error: `Invalid fileType: '${fileType}'. Accepted values are: ts, html, css` });
+            }
+        }
+
+        const safeName = componentName.trim();
+        const kebab = toKebabCase(safeName.replace(/Component$/, ''));
+
+        // Check if component exists
+        const componentDir = getComponentDir(safeName);
+        if (!fs.existsSync(componentDir)) {
+            return respond(404, {
+                error: `Component '${safeName}' not found`,
+                searchedPath: componentDir
+            });
+        }
+
+        // Find existing component files
+        const fileMap = {
+            ts: null,
+            html: null,
+            css: null
+        };
+
+        // Find TS file
+        for (const name of [`${kebab}.component.ts`, `${kebab}.ts`]) {
+            const candidate = path.join(componentDir, name);
+            if (fs.existsSync(candidate)) { fileMap.ts = candidate; break; }
+        }
+
+        // Find HTML file
+        for (const name of [`${kebab}.component.html`, `${kebab}.html`]) {
+            const candidate = path.join(componentDir, name);
+            if (fs.existsSync(candidate)) { fileMap.html = candidate; break; }
+        }
+
+        // Find CSS file
+        for (const prefix of [`${kebab}.component`, kebab]) {
+            for (const ext of ['css', 'scss', 'sass', 'less']) {
+                const candidate = path.join(componentDir, `${prefix}.${ext}`);
+                if (fs.existsSync(candidate)) { fileMap.css = candidate; break; }
+            }
+            if (fileMap.css) break;
+        }
+
+        // Read requested files
+        const result = {
+            componentName: safeName,
+            componentDir,
+            files: {}
+        };
+
+        const notFound = [];
+        for (const fileType of fileTypes) {
+            const filePath = fileMap[fileType];
+            if (filePath && fs.existsSync(filePath)) {
+                try {
+                    const content = fs.readFileSync(filePath, 'utf8');
+                    result.files[fileType] = {
+                        path: filePath,
+                        content
+                    };
+                } catch (e) {
+                    return respond(500, {
+                        error: `Failed to read ${fileType} file`,
+                        details: e.message
+                    });
+                }
+            } else {
+                notFound.push(fileType);
+            }
+        }
+
+        if (notFound.length > 0) {
+            result.filesNotFound = notFound;
+        }
+
+        if (Object.keys(result.files).length === 0) {
+            return respond(404, {
+                error: `No requested files found for component '${safeName}'`,
+                requestedFileTypes: fileTypes,
+                componentDir
+            });
+        }
+
+        return respond(200, result);
+    }
+
     /* -------- 1. CREATE COMPONENT (POST /component) -------- */
     if (parsedUrl.pathname === '/component' && req.method === 'POST') {
         let body;
@@ -763,6 +872,7 @@ server.listen(PORT, () => {
     console.log(`\nAngular Dev API Server running at http://localhost:${PORT}`);
     console.log('\nAvailable endpoints:');
     console.log('  GET  /health             - Server status');
+    console.log('  POST /component/get      - Get component files (ts, html, css)');
     console.log('  POST /component          - Create Angular component');
     console.log('  POST /component/update   - Update Angular component (ts, html, css)');
     console.log('  GET  /logs               - Last 20 lines of Angular dev log');

@@ -10,6 +10,44 @@ Response: {"status":"UP","projectDir":"/path/to/project","routesFile":"/path/to/
 
 ---
 
+POST /component/get
+Retrieves file contents (ts, html, css) from an existing Angular component by name.
+Content-Type: application/json
+
+Request body:
+{
+  "componentName": "my-header",           // required — kebab-case or camelCase
+  "fileTypes": ["ts", "html", "css"]     // optional — array of file types to retrieve (default: ["ts", "html", "css"])
+                                         // accepted values: "ts", "html", "css"
+}
+
+Sample Response (success):
+{
+  "componentName": "my-header",
+  "componentDir": "/project/src/app/my-header",
+  "files": {
+    "ts": { "path": "/project/src/app/my-header/my-header.ts", "content": "import { Component } from '@angular/core';\n..." },
+    "html": { "path": "/project/src/app/my-header/my-header.html", "content": "<h1>Header</h1>" },
+    "css": { "path": "/project/src/app/my-header/my-header.css", "content": "h1 { color: blue; }" }
+  },
+  "filesNotFound": []  // only present if some requested files don't exist
+}
+
+Sample Response (partial files found):
+{
+  "componentName": "my-header",
+  "componentDir": "/project/src/app/my-header",
+  "files": {
+    "ts": { "path": "...", "content": "..." },
+    "html": { "path": "...", "content": "..." }
+  },
+  "filesNotFound": ["css"]  // css file was requested but not found
+}
+
+Sample Response (component not found, 404):
+{ "error": "Component 'my-header' not found", "searchedPath": "/project/src/app/my-header" }
+---
+
 POST /component
 Creates an Angular component via `ng g c`, writes provided file contents, and auto-registers a route.
 Content-Type: application/json
@@ -28,7 +66,7 @@ Behavior notes:
 - A route is auto-registered after generation: kebab name is converted to camelCase for the route path (my-header -> myHeader) and PascalCase for the component class (MyHeaderComponent)
 - If route already exists, component creation still succeeds; route result will have skipped:true
 
-Response (success):
+Sample Response (success):
 {
   "message": "Component 'my-header' created successfully",
   "componentDir": "/project/src/app/my-header",
@@ -39,7 +77,7 @@ Response (success):
 
 if myHeader route is created the app can be accessed from http://localhost:4200/myHeader
 
-Response (route skipped):
+Sample Response (route skipped):
 {
   "message": "Component 'my-header' created successfully",
   "componentDir": "/project/src/app/my-header",
@@ -47,7 +85,7 @@ Response (route skipped):
   "route": { "skipped": true, "reason": "Route 'myHeader' already exists in routes file" }
 }
 
-Response (ng generate failed, 500):
+Sample Response (ng generate failed, 500):
 { "error": "ng generate component failed", "details": "..." }
 
 ---
@@ -72,7 +110,7 @@ Behavior notes:
 - Supports both Angular naming conventions: .component.ts and .ts, .component.html and .html, etc.
 - At least one file (ts, html, or css) must be provided for the update to succeed
 
-Response (success):
+Sample Response (success):
 {
   "message": "Component 'my-header' updated successfully",
   "componentDir": "/project/src/app/my-header",
@@ -80,10 +118,10 @@ Response (success):
   "filesNotUpdated": []  // only present if some files had write errors
 }
 
-Response (component not found, 404):
+Sample Response (component not found, 404):
 { "error": "Component 'my-header' not found", "searchedPath": "/project/src/app/my-header" }
 
-Response (no files provided, 400):
+Sample Response (no files provided, 400):
 { "error": "No files provided to update (ts, html, css are all null/undefined)", "componentDir": "/project/src/app/my-header" }
 ---
 
@@ -109,7 +147,7 @@ Response:
   "routesFile": "/project/src/app/app.routes.ts",
   "content": "import { Routes } from '@angular/router';\n\nexport const routes: Routes = [\n  { path: 'myHeader', component: MyHeaderComponent }\n];\n"
 }
-Response (no routes file found, 404): { "error": "Routes file not found in this project" }
+Sample Response (no routes file found, 404): { "error": "Routes file not found in this project" }
 
 ---
 
@@ -128,14 +166,14 @@ Behavior notes:
 - Supports both standalone routes (app.routes.ts) and NgModule style (app-routing.module.ts)
 - Skips adding import if the component name is already present in the file
 
-Response (success):
+Sample Response (success):
 {
   "message": "Route 'about' mapped to 'AboutComponent' added successfully",
   "routesFile": "/project/src/app/app.routes.ts",
   "addedRoute": { "path": "about", "component": "AboutComponent" }
 }
-Response (already exists, 409): { "error": "Route 'about' already exists in routes file" }
-Response (no routes file, 404): { "error": "Routes file not found — cannot add route" }
+Sample Response (already exists, 409): { "error": "Route 'about' already exists in routes file" }
+Sample Response (no routes file, 404): { "error": "Routes file not found — cannot add route" }
 
 ---
 
