@@ -538,7 +538,147 @@ const server = http.createServer(async (req, res) => {
         });
     }
 
-    /* -------- 2. GET LAST 20 LINES OF LOG (GET /logs) -------- */
+    /* -------- 2. UPDATE COMPONENT (POST /component/update) -------- */
+    if (parsedUrl.pathname === '/component/update' && req.method === 'POST') {
+        let body;
+        try {
+            body = await readBody(req);
+        } catch (e) {
+            return respond(400, { error: e.message });
+        }
+
+        const { componentName } = body;
+        let { ts, html, css } = body;
+
+        if (!componentName || typeof componentName !== 'string' || !componentName.trim()) {
+            return respond(400, { error: 'componentName is required' });
+        }
+
+        const safeName = componentName.trim();
+        const kebab = toKebabCase(safeName.replace(/Component$/, ''));
+
+        // Check if component exists
+        const componentDir = getComponentDir(safeName);
+        if (!fs.existsSync(componentDir)) {
+            return respond(404, {
+                error: `Component '${safeName}' not found`,
+                searchedPath: componentDir
+            });
+        }
+
+        // Find existing component files
+        const existingFiles = {};
+        for (const name of [`${kebab}.component.ts`, `${kebab}.ts`]) {
+            const candidate = path.join(componentDir, name);
+            if (fs.existsSync(candidate)) { existingFiles.ts = candidate; break; }
+        }
+        for (const name of [`${kebab}.component.html`, `${kebab}.html`]) {
+            const candidate = path.join(componentDir, name);
+            if (fs.existsSync(candidate)) { existingFiles.html = candidate; break; }
+        }
+        for (const prefix of [`${kebab}.component`, kebab]) {
+            for (const ext of ['css', 'scss', 'sass', 'less']) {
+                const candidate = path.join(componentDir, `${prefix}.${ext}`);
+                if (fs.existsSync(candidate)) { existingFiles.css = candidate; break; }
+            }
+            if (existingFiles.css) break;
+        }
+
+        // Helper to fix templateUrl and styleUrl (reuse from create component)
+        function fixComponentDecorator(tsContent) {
+            if (!tsContent) return tsContent;
+
+            // Detect actual html and css filenames from existing files
+            const actualHtml = existingFiles.html ? path.basename(existingFiles.html) : null;
+            const actualCss = existingFiles.css ? path.basename(existingFiles.css) : null;
+
+            // Replace templateUrl value with actual generated html filename
+            if (actualHtml) {
+                tsContent = tsContent.replace(
+                    /templateUrl\s*:\s*['"]([^'"]+)['"]/,
+                    `templateUrl: './${actualHtml}'`
+                );
+            }
+
+            // Replace styleUrl / styleUrls value with actual generated css filename
+            if (actualCss) {
+                // styleUrl: '...' (Angular 17+)
+                tsContent = tsContent.replace(
+                    /styleUrl\s*:\s*['"]([^'"]+)['"]/,
+                    `styleUrl: './${actualCss}'`
+                );
+                // styleUrls: ['...'] (older style)
+                tsContent = tsContent.replace(
+                    /styleUrls\s*:\s*\[\s*['"]([^'"]+)['"]\s*\]/,
+                    `styleUrls: ['./${actualCss}']`
+                );
+            }
+
+            return tsContent;
+        }
+
+        const written = [];
+        const errors = [];
+
+        // Write TS file (only if provided and not null/undefined)
+        if (ts !== undefined && ts !== null) {
+            ts = fixComponentDecorator(ts);
+            if (existingFiles.ts && fs.existsSync(existingFiles.ts)) {
+                try {
+                    fs.writeFileSync(existingFiles.ts, ts, 'utf8');
+                    written.push(existingFiles.ts);
+                } catch (e) {
+                    errors.push({ file: existingFiles.ts, error: e.message });
+                }
+            } else {
+                errors.push({ file: existingFiles.ts || `${kebab}.component.ts`, error: 'TS file not found' });
+            }
+        }
+
+        // Write HTML file (only if provided and not null/undefined)
+        if (html !== undefined && html !== null) {
+            if (existingFiles.html && fs.existsSync(existingFiles.html)) {
+                try {
+                    fs.writeFileSync(existingFiles.html, html, 'utf8');
+                    written.push(existingFiles.html);
+                } catch (e) {
+                    errors.push({ file: existingFiles.html, error: e.message });
+                }
+            } else {
+                errors.push({ file: existingFiles.html || `${kebab}.component.html`, error: 'HTML file not found' });
+            }
+        }
+
+        // Write CSS file (only if provided and not null/undefined)
+        if (css !== undefined && css !== null) {
+            if (existingFiles.css && fs.existsSync(existingFiles.css)) {
+                try {
+                    fs.writeFileSync(existingFiles.css, css, 'utf8');
+                    written.push(existingFiles.css);
+                } catch (e) {
+                    errors.push({ file: existingFiles.css, error: e.message });
+                }
+            } else {
+                errors.push({ file: existingFiles.css || `${kebab}.component.css`, error: 'CSS/SCSS file not found' });
+            }
+        }
+
+        if (written.length === 0) {
+            return respond(400, {
+                error: 'No files provided to update (ts, html, css are all null/undefined)',
+                componentDir
+            });
+        }
+
+        return respond(200, {
+            message: `Component '${safeName}' updated successfully`,
+            componentDir,
+            filesUpdated: written,
+            filesNotUpdated: errors.length ? errors : undefined
+        });
+    }
+
+    /* -------- 3. GET LAST 20 LINES OF LOG (GET /logs) -------- */
     if (parsedUrl.pathname === '/logs' && req.method === 'GET') {
         try {
             if (!fs.existsSync(LOG_FILE_PATH)) {
@@ -559,7 +699,7 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    /* -------- 3. GET ROUTES FILE CONTENT (GET /routes) -------- */
+    /* -------- 4. GET ROUTES FILE CONTENT (GET /routes) -------- */
     if (parsedUrl.pathname === '/routes' && req.method === 'GET') {
         if (!ROUTES_FILE) {
             return respond(404, { error: 'Routes file not found in this project' });
@@ -576,7 +716,7 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    /* -------- 4. ADD ROUTE (POST /routes) -------- */
+    /* -------- 5. ADD ROUTE (POST /routes) -------- */
     if (parsedUrl.pathname === '/routes' && req.method === 'POST') {
         if (!ROUTES_FILE) {
             return respond(404, { error: 'Routes file not found — cannot add route' });
@@ -622,9 +762,10 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
     console.log(`\nAngular Dev API Server running at http://localhost:${PORT}`);
     console.log('\nAvailable endpoints:');
-    console.log('  GET  /health           - Server status');
-    console.log('  POST /component        - Create Angular component');
-    console.log('  GET  /logs             - Last 20 lines of Angular dev log');
-    console.log('  GET  /routes           - Get routes file content');
-    console.log('  POST /routes           - Add a new route');
+    console.log('  GET  /health             - Server status');
+    console.log('  POST /component          - Create Angular component');
+    console.log('  POST /component/update   - Update Angular component (ts, html, css)');
+    console.log('  GET  /logs               - Last 20 lines of Angular dev log');
+    console.log('  GET  /routes             - Get routes file content');
+    console.log('  POST /routes             - Add a new route');
 });

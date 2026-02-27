@@ -52,6 +52,41 @@ Response (ng generate failed, 500):
 
 ---
 
+POST /component/update
+Updates an existing Angular component's ts, html, and/or css file contents. Requires the component to already exist.
+Content-Type: application/json
+
+Request body:
+{
+  "componentName": "my-header",      // required — kebab-case or camelCase
+  "ts": "...component class code...", // optional — full .ts file content
+  "html": "<h1>Hello</h1>",          // optional — full .html file content
+  "css": "h1 { color: red; }"        // optional — full .css/.scss file content
+}
+
+Behavior notes:
+- componentName is converted to kebab-case internally (myHeader -> my-header)
+- Component directory must exist; returns 404 if not found
+- Only provided files are updated (ts, html, css) — null/undefined fields are skipped
+- templateUrl and styleUrl values inside the ts payload are automatically rewritten to match the actual existing filenames
+- Supports both Angular naming conventions: .component.ts and .ts, .component.html and .html, etc.
+- At least one file (ts, html, or css) must be provided for the update to succeed
+
+Response (success):
+{
+  "message": "Component 'my-header' updated successfully",
+  "componentDir": "/project/src/app/my-header",
+  "filesUpdated": ["/project/src/app/my-header/my-header.ts", "/project/src/app/my-header/my-header.html"],
+  "filesNotUpdated": []  // only present if some files had write errors
+}
+
+Response (component not found, 404):
+{ "error": "Component 'my-header' not found", "searchedPath": "/project/src/app/my-header" }
+
+Response (no files provided, 400):
+{ "error": "No files provided to update (ts, html, css are all null/undefined)", "componentDir": "/project/src/app/my-header" }
+---
+
 GET /logs
 Returns the last 20 lines of the Angular dev server log file (stdout + stderr from npm start).
 Response:
