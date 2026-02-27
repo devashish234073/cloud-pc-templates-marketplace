@@ -532,7 +532,7 @@ const server = http.createServer(async (req, res) => {
             componentDir,
             filesWritten: written,
             route: routeResult && routeResult.success
-                ? { path: routeResult.path, component: routeResult.component }
+                ? { path: routeResult.path, component: routeResult.component, urlToTest: `http://localhost/${routeResult.path}` }
                 : { skipped: true, reason: routeResult ? routeResult.error : 'No routes file found' },
             errors: errors.length ? errors : undefined
         });
