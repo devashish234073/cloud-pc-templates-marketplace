@@ -48,5 +48,16 @@
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector-API.md",
         "healthCheckUrl": "http://localhost:3034/health",
         "fileName": "angularConnector.txt"
+    },
+    {
+        "id": "selenium connector",
+        "name": "Selenium Connector",
+        "port": 3035,
+        "risky":true,
+        "description": "Provides api to execute arbitrary selenium code, To start the script first unzip it, then inside the directory run npm install and then run server.txt with node server.txt",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/rawSeleniumConnector.zip",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/rawSeleniumConnector-API.md",
+        "healthCheckUrl": "http://localhost:3034/health",
+        "fileName": "rawSeleniumConnector.zip"
     }
 ]
