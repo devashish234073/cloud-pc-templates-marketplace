@@ -1,53 +1,44 @@
-Raw selenium Connector: This agent let's you run arbitrary selenium code in nodejs.
+Raw Selenium Connector — Agent API Docs
 
-All APIs run on:
-http://localhost:3035
+Base URL: http://localhost:3035
 
-To Check Health of the git explorer agent call
-
+────────────────────────────────────────
+HEALTH CHECK
+────────────────────────────────────────
 GET http://localhost:3035/health
+Response: { "status": "UP" }
 
-Response will look like:
-{"status":"UP"}
+────────────────────────────────────────
+EXECUTE SELENIUM CODE
+────────────────────────────────────────
+POST http://localhost:3035/execute
 
-To Run Selenium Code
+Content-Type: application/json
+Body: { "code": "<your nodejs selenium code as a string>" }
 
-POST http://localhost:3035/execute with the arbitrary code with the last line must contain "return results;" where you will populate the results with the data you want you see in the response.
+⚠️  CRITICAL RULES:
+1. The body MUST be a JSON object with a single key: "code"
+2. The value of "code" is the entire Selenium script as a JSON string
+3. Escape all double quotes inside the code as \"
+4. Use \n for newlines inside the code string
+5. The last statement MUST be: return results;
+6. Always populate the `results` variable with the data you want returned
+7. Always call await driver.quit() before returning
+8. Inside executeScript(), always use function() {} syntax — never arrow functions () =>
+9. Inside executeScript(), always use explicit return statements — never shorthand object returns
 
-Below text is the exampe payload, it's plain text and syntactically should be a correct ndoejs selenium code.
+────────────────────────────────────────
+EXAMPLE PAYLOAD
+────────────────────────────────────────
+{
+  "code": "const driver = await createDriver();\nawait driver.get(\"https://example.com\");\n\nconst title = await driver.getTitle();\nconst url = await driver.getCurrentUrl();\n\nconst elements = await driver.executeScript(function() {\n  var buttons = Array.from(document.querySelectorAll(\"button\"));\n  var anchors = Array.from(document.querySelectorAll(\"a\"));\n  return buttons.concat(anchors).map(function(el) {\n    return {\n      tag: el.tagName.toLowerCase(),\n      text: el.innerText ? el.innerText.trim() : \"\",\n      href: el.href || null\n    };\n  });\n});\n\nawait driver.quit();\n\nlet results = { title, url, elements };\nreturn results;"
+}
 
-const driver = await createDriver();
-const fs = require("fs");
-await driver.get("https://cloud-pc-templates.com");
+────────────────────────────────────────
+RESPONSE FORMAT
+────────────────────────────────────────
+Success:
+{ "success": true, "result": { ...whatever you put in results... } }
 
-const title = await driver.getTitle();
-const url = await driver.getCurrentUrl();
-const html = await driver.getPageSource();
-
-// Collect all buttons and anchor tags
-const buttons_and_a_s = await driver.executeScript(() => {
-  const buttons = Array.from(document.querySelectorAll("button"));
-  const anchors = Array.from(document.querySelectorAll("a"));
-  
-  const elements = [...buttons, ...anchors].map((el) => ({
-    tag: el.tagName.toLowerCase(),
-    text: el.innerText?.trim() || "",
-    href: el.href || null,
-    id: el.id || null,
-    className: el.className || null,
-    onclick: el.onclick?.toString() || null
-  }));
-  
-  return elements;
-});
-
-await driver.quit();
-
-let results = {
-  title,
-  url,
-  htmlLength: html.length,
-  buttons_and_a_s
-};
-return results;
-
+Failure:
+{ "success": false, "error": "error message here" }
