@@ -14,9 +14,8 @@ To Run Selenium Code
 
 POST http://localhost:3035/execute with the arbitrary code with the last line must contain "return results;" where you will populate the results with the data you want you see in the response.
 
-Below text between <PAYLOAD-START> and <PAYLOAD-END> is the exampe payload, it's plain text and syntactically should be a correct ndoejs selenium code.
+Below text is the exampe payload, it's plain text and syntactically should be a correct ndoejs selenium code.
 
-<PAYLOAD-START>
 const driver = await createDriver();
 const fs = require("fs");
 await driver.get("https://cloud-pc-templates.com");
@@ -51,5 +50,4 @@ let results = {
   buttons_and_a_s
 };
 return results;
-<PAYLOAD-END>
 
