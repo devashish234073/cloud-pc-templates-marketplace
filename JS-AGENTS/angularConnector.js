@@ -364,6 +364,8 @@ const server = http.createServer(async (req, res) => {
     if (parsedUrl.pathname === '/health' && req.method === 'GET') {
         return respond(200, {
             status: 'UP',
+            version: '1.0',
+            type: 'agent',
             projectDir: PROJECT_DIR,
             routesFile: ROUTES_FILE || null,
             logFile: LOG_FILE_PATH,

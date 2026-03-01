@@ -88,7 +88,9 @@ const server = http.createServer(async (req, res) => {
     if (parsedUrl.pathname === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({
-            status: 'UP'
+            status: 'UP',
+            version: '1.0',
+            type: 'agent'
         }));
     } else if (requestUrl.pathname === "/search" && req.method === "GET") {
         const query = requestUrl.searchParams.get("q");

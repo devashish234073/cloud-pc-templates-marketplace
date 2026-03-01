@@ -2,6 +2,7 @@
     {
         "id": "file-explorer",
         "name": "File Explorer",
+        "currentVersion": "1.0",
         "port": 3030,
         "description": "Readonly agent for your files.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/fileExplorerConnector.js",
@@ -12,8 +13,9 @@
     {
         "id": "tools-explorer",
         "name": "Tools Explorer",
+        "currentVersion": "1.0",
         "port": 3032,
-        "description": "provides apis that can be called to get the version of various tools, like java,maven,node,npm,python,etc.",
+        "description": "provides apis that can be called to get the currentVersion of various tools, like java,maven,node,npm,python,etc.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/toolsExplorerConnector.js",
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/toolsExplorerConnector-API.md",
         "healthCheckUrl": "http://localhost:3032/health",
@@ -22,6 +24,7 @@
     {
         "id": "git-explorer",
         "name": "GIt Explorer",
+        "currentVersion": "1.0",
         "port": 3033,
         "description": "provides APIs to manage and explore Git repositories. It allows cloning repositories into a specified base folder, listing detected repositories, and searching source code by file name or content.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/gitExplorerConnector.js",
@@ -32,6 +35,7 @@
     {
         "id": "web-explorer",
         "name": "Web Explorer",
+        "currentVersion": "1.0",
         "port": 3031,
         "description": "Performs a web search using DuckDuckGo (HTML endpoint) and returns top 5 results.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/webExplorerConnector.js",
@@ -42,6 +46,7 @@
     {
         "id": "angular connector",
         "name": "Angular Connector",
+        "currentVersion": "1.0",
         "port": 3034,
         "description": "provides APIs to create angular component and register routes or check logs after running that.\nTo run first create an empty angular project in your machine by running 'ng new testApp'\nand then inside that testApp folder place this connector file and run it with\nnode <filename>",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector.js",
@@ -52,6 +57,7 @@
     {
         "id": "selenium connector",
         "name": "Selenium Connector",
+        "currentVersion": "1.0",
         "port": 3035,
         "risky": true,
         "risk": "This agent can run arbitrary selenium code, so use it at your own risk as if the llm can send risky code, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended code.",
