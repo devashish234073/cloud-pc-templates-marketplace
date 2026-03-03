@@ -105,6 +105,17 @@ Resources:
           node ollamaoffline-proxy.js &
           cd /home/ubuntu/Desktop/JS-AGENTS
           for file in *.js; do if [ -f "$file" ]; then echo "Starting: $file"; node "$file" & fi; done
+          for zip in *.zip; do 
+            if [ -f "$zip" ]; then 
+              unzip -o "$zip" -d "${zip%.zip}" && \
+              cd "${zip%.zip}" && \
+              if [ -f package.json ]; then 
+                echo "Running npm start in: ${zip%.zip}"; 
+                npm start &
+              fi
+              cd ..
+            fi
+          done
           public_ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
           echo RUN vncserver AND SETUP THE PASSWORD
           echo THEN RUN ssh -L 5901:localhost:5901 -i ${KeyPairName}.pem ubuntu@$public_ip WITH YOUR LOCAL MACHINE AND THEN CONNECT USING A VNC VIEWER CLIENT AT "$public_ip":5901
