@@ -2,432 +2,604 @@ const http = require('http');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 
 const PORT = 3033;
 
-/* ------------------ BASE FOLDER FROM CLI ------------------ */
+/* ================================================================
+   BASE DIR FROM CLI
+   ================================================================ */
 
 let BASE_DIR;
 
-/* ------------------ FOLDER EXCLUSIONS ------------------ */
-
-const EXCLUDED_FOLDERS = ['node_modules', 'target'];
-
-function shouldExcludeFolder(folderName) {
-    if (folderName.indexOf(".") == 0) {
-        //console.log(`${folderName} excluded..`);
-        return true;
-    }
-    if (EXCLUDED_FOLDERS.includes(folderName.toLowerCase())) {
-        //console.log(`${folderName} excluded...`);
-        return true;
-    }
-    //console.log(`including folder ${folderName}`);
-    return false;
-}
-
 if (process.argv[2]) {
     const inputPath = path.resolve(process.argv[2]);
-
     if (!fs.existsSync(inputPath) || !fs.statSync(inputPath).isDirectory()) {
-        console.error("Invalid directory provided:", inputPath);
+        console.error('Invalid directory provided:', inputPath);
         process.exit(1);
     }
-
     BASE_DIR = inputPath;
 } else {
-    BASE_DIR = process.cwd(); // current working directory
+    BASE_DIR = process.cwd();
 }
 
-console.log("Scanning Base Directory:", BASE_DIR);
+console.log('Git Explorer Base Directory:', BASE_DIR);
 
-if (!fs.existsSync(BASE_DIR)) {
-    fs.mkdirSync(BASE_DIR, { recursive: true });
+/* ================================================================
+   FOLDER EXCLUSIONS
+   ================================================================ */
+
+const EXCLUDED_FOLDERS = new Set(['node_modules', 'target', 'dist', 'build', '.git']);
+
+function shouldExcludeFolder(folderName) {
+    return folderName.startsWith('.') || EXCLUDED_FOLDERS.has(folderName.toLowerCase());
 }
 
-if (!fs.statSync(BASE_DIR).isDirectory()) {
-    console.error("Provided path is not a directory");
-    process.exit(1);
+/* ================================================================
+   BINARY FILE DETECTION
+   ================================================================ */
+
+const BINARY_EXTENSIONS = new Set([
+    'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'ico', 'svg',
+    'mp3', 'mp4', 'wav', 'ogg', 'avi', 'mov', 'mkv',
+    'exe', 'dll', 'so', 'dylib',
+    'zip', 'rar', '7z', 'tar', 'gz', 'bz2',
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'class', 'jar', 'pyc', 'wasm', 'bin', 'dat'
+]);
+
+function isBinary(filePath) {
+    const ext = path.extname(filePath).replace('.', '').toLowerCase();
+    return BINARY_EXTENSIONS.has(ext);
 }
 
-console.log("Git Explorer Base Directory:", BASE_DIR);
-
-function readFilesContentInGitRepoByNames(fileNames) {
-    const result = {};
-    fileNames.forEach(name => {
-        result[name] = [];
-    });
-
-    fileNames.forEach(name => {
-        const isPathInput = name.includes(path.sep) || path.isAbsolute(name);
-        // CASE 1: Specific file path passed
-        if (isPathInput) {
-            if (fs.existsSync(name) && fs.statSync(name).isFile()) {
-                if (isBinary(name)) return;
-                try {
-                    const content = fs.readFileSync(name, 'utf8');
-                    result[name].push({
-                        path: name,
-                        content: content
-                    });
-                } catch { }
-            }
-        }
-        // CASE 2: Only file name passed (existing behavior)
-        else {
-            repos.forEach(repo => {
-                walkDir(repo.path, (file) => {
-                    const base = path.basename(file);
-                    if (base === name) {
-                        if (isBinary(file)) return;
-                        try {
-                            const content = fs.readFileSync(file, 'utf8');
-                            result[name].push({
-                                path: file,
-                                content: content
-                            });
-                        } catch { }
-                    }
-                });
-            });
-        }
-    });
-    return result;
-}
-
-/* ------------------ REPO LIST ------------------ */
+/* ================================================================
+   REPO LIST & SCANNING
+   ================================================================ */
 
 let repos = [];
 
-/* Scan base folder for git repos */
 function scanRepos() {
     repos = [];
+    let folders;
+    try {
+        folders = fs.readdirSync(BASE_DIR);
+    } catch (err) {
+        console.error('Failed to scan BASE_DIR:', err.message);
+        return;
+    }
 
-    const folders = fs.readdirSync(BASE_DIR);
-
-    let countExc = 0;
-    let countInc = 0;
     for (const folder of folders) {
-        if (shouldExcludeFolder(folder)) {
-            countExc++;
-            continue;
-        }
+        if (shouldExcludeFolder(folder)) continue;
         const fullPath = path.join(BASE_DIR, folder);
         const gitPath = path.join(fullPath, '.git');
-
         try {
             if (fs.statSync(fullPath).isDirectory() && fs.existsSync(gitPath)) {
-                repos.push({
-                    name: folder,
-                    path: fullPath
-                });
-                countInc++;
-            } else {
-                countExc++;
+                repos.push({ name: folder, path: fullPath });
             }
-        } catch {
-            countExc++;
-        }
+        } catch { /* skip unreadable entries */ }
     }
-    console.log(`scanned ${countInc + countExc} folders, ${countExc} excluded} found repos`, repos);
+    console.log(`Repos found: ${repos.length}`, repos.map(r => r.name));
 }
 
 scanRepos();
 
-/* ------------------ GIT CLONE ------------------ */
+/* ================================================================
+   GIT HELPERS  (promise-wrapped exec)
+   ================================================================ */
 
-function cloneRepo(repoUrl) {
-    return new Promise((resolve) => {
-        const repoName = repoUrl.split('/').pop().replace('.git', '');
-        const targetPath = path.join(BASE_DIR, repoName);
-
-        if (fs.existsSync(targetPath)) {
-            return resolve({ error: "Repository already exists" });
-        }
-
-        exec(`git clone ${repoUrl} "${targetPath}"`, (error, stdout, stderr) => {
-            if (error) {
-                return resolve({ error: stderr || error.message });
-            }
-
-            scanRepos();
-
-            resolve({
-                message: "Repository cloned successfully",
-                repo: repoName
-            });
+function git(repoPath, args) {
+    return new Promise((resolve, reject) => {
+        exec(`git -C "${repoPath}" ${args}`, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error(stderr.trim() || err.message));
+            resolve(stdout.trim());
         });
     });
 }
 
-/* ------------------ SEARCH HELPERS ------------------ */
-
-const BLOCKED_EXTENSIONS = [
-    'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp',
-    'mp3', 'mp4', 'exe', 'dll', 'zip', 'rar', '7z'
-];
-
-function isBinary(filePath) {
-    const ext = path.extname(filePath).replace('.', '').toLowerCase();
-    return BLOCKED_EXTENSIONS.includes(ext);
+/** Return { remoteUrl, repoName } for a repo path, or nulls on failure */
+async function getRemoteMeta(repoPath) {
+    try {
+        const remoteUrl = await git(repoPath, 'remote get-url origin');
+        // derive a clean name: last segment, strip .git
+        const repoName = remoteUrl.split('/').pop().replace(/\.git$/, '');
+        return { remoteUrl, repoName };
+    } catch {
+        // no remote configured – use folder name
+        const repoName = path.basename(repoPath);
+        return { remoteUrl: null, repoName };
+    }
 }
 
-/* ------------------ SAFE WALK ------------------ */
+/** Wrap any payload with repo context */
+async function withRepoMeta(repoPath, payload) {
+    const { remoteUrl, repoName } = await getRemoteMeta(repoPath);
+    let currentBranch = null;
+    try { currentBranch = await git(repoPath, 'rev-parse --abbrev-ref HEAD'); } catch { }
+    return { repoName, remoteUrl, currentBranch, ...payload };
+}
 
+/** Find a repo object by name (exact) */
+function findRepo(name) {
+    return repos.find(r => r.name === name) || null;
+}
+
+/* ================================================================
+   FILE SYSTEM HELPERS
+   ================================================================ */
+
+/** Recursively walk a directory, calling callback(fullPath) for every file */
 function walkDir(dir, callback) {
     let files;
-
-    try {
-        files = fs.readdirSync(dir);
-    } catch {
-        return;
-    }
-
+    try { files = fs.readdirSync(dir); } catch { return; }
     for (const file of files) {
         const fullPath = path.join(dir, file);
-
         try {
             const stat = fs.statSync(fullPath);
-
             if (stat.isDirectory()) {
-                if (shouldExcludeFolder(file)) continue;
-                walkDir(fullPath, callback);
+                if (!shouldExcludeFolder(file)) walkDir(fullPath, callback);
             } else {
                 callback(fullPath);
             }
-        } catch { }
+        } catch { /* skip */ }
     }
 }
 
-/* Exact file name */
-function getFileInRepoByName(name) {
-    const results = [];
+/**
+ * Build a nested directory tree object (respects EXCLUDED_FOLDERS).
+ * Returns { name, type:'directory'|'file', children?, size? }
+ */
+function buildTree(dir, rootPath) {
+    const name = path.basename(dir);
+    const node = { name, type: 'directory', path: path.relative(rootPath, dir) || '.', children: [] };
+    let entries;
+    try { entries = fs.readdirSync(dir); } catch { return node; }
 
-    repos.forEach(repo => {
-        walkDir(repo.path, (file) => {
-            if (path.basename(file) === name) {
-                results.push(file);
-            }
-        });
-    });
-
-    return results;
-}
-
-/* Partial file name */
-function findByPartialFileName(name) {
-    const lower = name.toLowerCase();
-    const results = [];
-
-    repos.forEach(repo => {
-        walkDir(repo.path, (file) => {
-            if (path.basename(file).toLowerCase().includes(lower)) {
-                results.push(file);
-            }
-        });
-    });
-
-    return results;
-}
-
-/* Search by content */
-function findTextInFilesInGitRepo(text) {
-    const results = [];
-    const lowerSearch = text.toLowerCase();
-
-    repos.forEach(repo => {
-        walkDir(repo.path, (file) => {
-            if (isBinary(file)) return;
-
-            try {
-                const content = fs.readFileSync(file, 'utf8');
-                const lines = content.split(/\r?\n/);
-                const matches = [];
-
-                lines.forEach((line, index) => {
-                    const lowerLine = line.toLowerCase();
-                    const foundIndex = lowerLine.indexOf(lowerSearch);
-
-                    if (foundIndex !== -1) {
-                        let snippet = line;
-
-                        if (line.length > 70) {
-                            const start = Math.max(0, foundIndex - 35);
-                            const end = Math.min(line.length, foundIndex + lowerSearch.length + 35);
-                            snippet = line.substring(start, end);
-                        }
-
-                        matches.push({
-                            lineNumber: index + 1,
-                            line: snippet
-                        });
-                    }
+    for (const entry of entries) {
+        if (shouldExcludeFolder(entry)) continue;
+        const fullPath = path.join(dir, entry);
+        try {
+            const stat = fs.statSync(fullPath);
+            if (stat.isDirectory()) {
+                node.children.push(buildTree(fullPath, rootPath));
+            } else {
+                node.children.push({
+                    name: entry,
+                    type: 'file',
+                    path: path.relative(rootPath, fullPath),
+                    size: stat.size,
+                    extension: path.extname(entry).replace('.', '').toLowerCase() || null
                 });
-
-                if (matches.length > 0) {
-                    results.push({
-                        file,
-                        matches
-                    });
-                }
-
-            } catch { }
-        });
-    });
-
-    return results;
+            }
+        } catch { /* skip */ }
+    }
+    return node;
 }
 
-/* ------------------ SERVER ------------------ */
+/* ================================================================
+   REQUEST BODY PARSER
+   ================================================================ */
+
+function readBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', () => {
+            try { resolve(JSON.parse(body)); }
+            catch { reject(new Error('Invalid JSON')); }
+        });
+        req.on('error', reject);
+    });
+}
+
+/* ================================================================
+   RESPONSE HELPERS
+   ================================================================ */
+
+function send(res, status, data) {
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data, null, 2));
+}
+
+function err400(res, msg) { send(res, 400, { error: msg }); }
+function err404(res, msg) { send(res, 404, { error: msg }); }
+function err500(res, msg) { send(res, 500, { error: msg }); }
+
+/* ================================================================
+   SERVER
+   ================================================================ */
 
 const server = http.createServer(async (req, res) => {
 
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        res.writeHead(204); // No content
-        return res.end();
-    }
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
-    const parsedUrl = url.parse(req.url, true);
+    const parsed = url.parse(req.url, true);
+    const { pathname, query } = parsed;
 
-    /* HEALTH */
-    if (parsedUrl.pathname === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({
+    /* ── GET /health ──────────────────────────────────────────── */
+    if (pathname === '/health') {
+        return send(res, 200, {
             status: 'UP',
-            version: '1.0',
-            type: 'agent',
+            version: '2.0',
+            type: 'git-explorer-agent',
             baseDir: BASE_DIR,
-            repoCount: repos.length
+            repoCount: repos.length,
+            repos: repos.map(r => r.name)
+        });
+    }
+
+    /* ── GET /repos ───────────────────────────────────────────── */
+    if (pathname === '/git/repos') {
+        const list = await Promise.all(repos.map(async r => {
+            const { remoteUrl, repoName } = await getRemoteMeta(r.path);
+            let currentBranch = null;
+            try { currentBranch = await git(r.path, 'rev-parse --abbrev-ref HEAD'); } catch { }
+            return { folderName: r.name, repoName, remoteUrl, currentBranch, path: r.path };
+        }));
+        return send(res, 200, { count: list.length, repos: list });
+    }
+
+    /* ── GET /rescan ──────────────────────────────────────────── */
+    if (pathname === '/git/rescan') {
+        scanRepos();
+        return send(res, 200, { message: 'Rescanned', repoCount: repos.length, repos: repos.map(r => r.name) });
+    }
+
+    /* ── GET /clone?url=<gitUrl> ──────────────────────────────── */
+    if (pathname === '/git/clone') {
+        const repoUrl = query.url;
+        if (!repoUrl) return err400(res, 'Provide ?url=<git-repo-url>');
+
+        const repoName = repoUrl.split('/').pop().replace(/\.git$/, '');
+        const targetPath = path.join(BASE_DIR, repoName);
+
+        if (fs.existsSync(targetPath)) {
+            return send(res, 200, { error: 'Repository already exists locally', repoName, path: targetPath });
+        }
+
+        exec(`git clone "${repoUrl}" "${targetPath}"`, { maxBuffer: 50 * 1024 * 1024 }, async (error, stdout, stderr) => {
+            if (error) return err500(res, stderr.trim() || error.message);
+            scanRepos();
+            const repo = findRepo(repoName);
+            const meta = repo ? await withRepoMeta(repo.path, { message: 'Cloned successfully' }) : { message: 'Cloned successfully', repoName };
+            return send(res, 200, meta);
+        });
+        return; // async, response sent inside callback
+    }
+
+    /* ── GET /branches?repo=<name> ───────────────────────────── */
+    if (pathname === '/git/branches') {
+        const repo = findRepo(query.repo);
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
+
+        try {
+            const [localRaw, remoteRaw, currentBranch] = await Promise.all([
+                git(repo.path, 'branch --format=%(refname:short)'),
+                git(repo.path, 'branch -r --format=%(refname:short)'),
+                git(repo.path, 'rev-parse --abbrev-ref HEAD')
+            ]);
+
+            const local = localRaw ? localRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+            const remote = remoteRaw ? remoteRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+            return send(res, 200, await withRepoMeta(repo.path, {
+                currentBranch,
+                localBranches: local,
+                remoteBranches: remote
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── POST /switch  body: { repo, branch } ────────────────── */
+    if (pathname === '/git/switch' && req.method === 'POST') {
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const { repo: repoName, branch } = body;
+        if (!repoName || !branch) return err400(res, 'Provide { repo, branch }');
+
+        const repo = findRepo(repoName);
+        if (!repo) return err404(res, `Repo "${repoName}" not found`);
+
+        try {
+            await git(repo.path, `checkout "${branch}"`);
+            const currentBranch = await git(repo.path, 'rev-parse --abbrev-ref HEAD');
+            return send(res, 200, await withRepoMeta(repo.path, {
+                message: `Switched to branch "${branch}"`,
+                currentBranch
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── GET /tree?repo=<name> ───────────────────────────────── */
+    if (pathname === '/git/tree') {
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        const repo = findRepo(query.repo);
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
+
+        const tree = buildTree(repo.path, repo.path);
+        return send(res, 200, await withRepoMeta(repo.path, { tree }));
+    }
+
+    /* ── GET /file?path=<absoluteOrRelative> ─────────────────── */
+    /*   Returns full content of a single file.
+         path can be absolute OR relative to BASE_DIR.           */
+    if (pathname === '/git/file') {
+        const filePath = query.path;
+        if (!filePath) return err400(res, 'Provide ?path=<filePath>');
+
+        const absPath = path.isAbsolute(filePath) ? filePath : path.join(BASE_DIR, filePath);
+
+        if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+            return err404(res, `File not found: ${absPath}`);
+        }
+        if (isBinary(absPath)) return err400(res, 'File is binary – cannot return content');
+
+        // Figure out which repo this file belongs to (if any)
+        const ownerRepo = repos.find(r => absPath.startsWith(r.path + path.sep));
+
+        try {
+            const content = fs.readFileSync(absPath, 'utf8');
+            const stat = fs.statSync(absPath);
+            const base = { filePath: absPath, size: stat.size, extension: path.extname(absPath).replace('.', '') || null, content };
+
+            if (ownerRepo) {
+                return send(res, 200, await withRepoMeta(ownerRepo.path, base));
+            }
+            return send(res, 200, { repoName: null, remoteUrl: null, ...base });
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── GET /filesByExtension?repo=<name>&ext=<ext[,ext2]> ──── */
+    /*   Returns full paths of all files matching given extension(s).
+         ext can be comma-separated: js,ts,jsx                    */
+    if (pathname === '/git/filesByExtension') {
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        if (!query.ext)  return err400(res, 'Provide ?ext=<extension> (e.g. js or js,ts,jsx)');
+
+        const repo = findRepo(query.repo);
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
+
+        const exts = new Set(query.ext.toLowerCase().split(',').map(e => e.trim().replace(/^\./, '')));
+        const matched = [];
+
+        walkDir(repo.path, file => {
+            const ext = path.extname(file).replace('.', '').toLowerCase();
+            if (exts.has(ext)) matched.push(file);
+        });
+
+        return send(res, 200, await withRepoMeta(repo.path, {
+            extensions: [...exts],
+            count: matched.length,
+            files: matched
         }));
     }
 
-    /* LIST REPOS */
-    if (parsedUrl.pathname === '/repos') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({
-            count: repos.length,
-            repos
-        }));
+    /* ── GET /remoteUrl?repo=<name> ──────────────────────────── */
+    if (pathname === '/git/remoteUrl') {
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        const repo = findRepo(query.repo);
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
+
+        try {
+            const remotes = await git(repo.path, 'remote -v');
+            const lines = remotes.split('\n').filter(Boolean);
+            const parsed_remotes = {};
+            for (const line of lines) {
+                // format: origin\thttps://... (fetch)
+                const m = line.match(/^(\S+)\s+(\S+)\s+\((\w+)\)$/);
+                if (m) {
+                    if (!parsed_remotes[m[1]]) parsed_remotes[m[1]] = {};
+                    parsed_remotes[m[1]][m[3]] = m[2];
+                }
+            }
+            const { remoteUrl, repoName } = await getRemoteMeta(repo.path);
+            return send(res, 200, { repoName, remoteUrl, remotes: parsed_remotes });
+        } catch (e) { return err500(res, e.message); }
     }
 
-    /* CLONE */
-    if (parsedUrl.pathname === '/clone') {
-        const { url: repoUrl } = parsedUrl.query;
+    /* ── GET /log?repo=<name>&branch=<branch>&limit=<n> ──────── */
+    if (pathname === '/git/log') {
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        const repo = findRepo(query.repo);
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
 
-        if (!repoUrl) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({
-                error: "Provide ?url=<git-repo-url>"
+        const limit = Math.min(parseInt(query.limit) || 20, 200);
+        const branchArg = query.branch ? `"${query.branch}"` : 'HEAD';
+
+        try {
+            const raw = await git(repo.path,
+                `log ${branchArg} --pretty=format:"%H|%an|%ae|%ad|%s" --date=iso -n ${limit}`);
+            const commits = raw.split('\n').filter(Boolean).map(line => {
+                const [hash, author, email, date, ...msgParts] = line.split('|');
+                return { hash, author, email, date, message: msgParts.join('|') };
+            });
+            return send(res, 200, await withRepoMeta(repo.path, { branch: query.branch || 'HEAD', count: commits.length, commits }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── GET /status?repo=<name> ─────────────────────────────── */
+    if (pathname === '/git/status') {
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        const repo = findRepo(query.repo);
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
+
+        try {
+            const raw = await git(repo.path, 'status --porcelain');
+            const lines = raw.split('\n').filter(Boolean);
+            const files = lines.map(l => ({
+                status: l.substring(0, 2).trim(),
+                file: l.substring(3).trim()
+            }));
+            return send(res, 200, await withRepoMeta(repo.path, {
+                clean: files.length === 0,
+                changedFileCount: files.length,
+                files
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── GET /findByName?repo=<name>&name=<fileName> ─────────── */
+    /*   Exact file name match across one repo (or all if no repo given) */
+    if (pathname === '/git/findByName') {
+        const name = query.name;
+        if (!name) return err400(res, 'Provide ?name=<fileName>');
+
+        const targetRepos = query.repo ? [findRepo(query.repo)].filter(Boolean) : repos;
+        if (query.repo && targetRepos.length === 0) return err404(res, `Repo "${query.repo}" not found`);
+
+        const results = [];
+        targetRepos.forEach(repo => {
+            walkDir(repo.path, file => {
+                if (path.basename(file) === name) results.push(file);
+            });
+        });
+
+        // If single repo, wrap with meta
+        if (query.repo && targetRepos.length === 1) {
+            return send(res, 200, await withRepoMeta(targetRepos[0].path, { query: name, count: results.length, files: results }));
+        }
+        return send(res, 200, { query: name, count: results.length, files: results });
+    }
+
+    /* ── GET /findByPartialName?repo=<name>&name=<partial> ───── */
+    if (pathname === '/git/findByPartialName') {
+        const name = query.name;
+        if (!name) return err400(res, 'Provide ?name=<partialName>');
+
+        const lower = name.toLowerCase();
+        const targetRepos = query.repo ? [findRepo(query.repo)].filter(Boolean) : repos;
+        if (query.repo && targetRepos.length === 0) return err404(res, `Repo "${query.repo}" not found`);
+
+        const results = [];
+        targetRepos.forEach(repo => {
+            walkDir(repo.path, file => {
+                if (path.basename(file).toLowerCase().includes(lower)) results.push(file);
+            });
+        });
+
+        if (query.repo && targetRepos.length === 1) {
+            return send(res, 200, await withRepoMeta(targetRepos[0].path, { query: name, count: results.length, files: results }));
+        }
+        return send(res, 200, { query: name, count: results.length, files: results });
+    }
+
+    /* ── GET /search?repo=<name>&text=<text> ─────────────────── */
+    /*   Full text search across files, returns line matches      */
+    if (pathname === '/git/search') {
+        const text = query.text;
+        if (!text) return err400(res, 'Provide ?text=<searchText>');
+
+        const targetRepos = query.repo ? [findRepo(query.repo)].filter(Boolean) : repos;
+        if (query.repo && targetRepos.length === 0) return err404(res, `Repo "${query.repo}" not found`);
+
+        const lowerSearch = text.toLowerCase();
+        const results = [];
+
+        targetRepos.forEach(repo => {
+            walkDir(repo.path, file => {
+                if (isBinary(file)) return;
+                try {
+                    const content = fs.readFileSync(file, 'utf8');
+                    const lines = content.split(/\r?\n/);
+                    const matches = [];
+                    lines.forEach((line, idx) => {
+                        const foundAt = line.toLowerCase().indexOf(lowerSearch);
+                        if (foundAt !== -1) {
+                            const start = Math.max(0, foundAt - 40);
+                            const end = Math.min(line.length, foundAt + lowerSearch.length + 40);
+                            matches.push({
+                                lineNumber: idx + 1,
+                                snippet: line.length > 80 ? line.substring(start, end) : line
+                            });
+                        }
+                    });
+                    if (matches.length) results.push({ file, matchCount: matches.length, matches });
+                } catch { /* unreadable file */ }
+            });
+        });
+
+        if (query.repo && targetRepos.length === 1) {
+            return send(res, 200, await withRepoMeta(targetRepos[0].path, {
+                searchText: text, totalFiles: results.length,
+                totalMatches: results.reduce((a, r) => a + r.matchCount, 0),
+                results
             }));
         }
-
-        const result = await cloneRepo(repoUrl);
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify(result));
-    }
-
-    /* FIND EXACT */
-    if (parsedUrl.pathname === '/getFileInRepoByName') {
-        const { name } = parsedUrl.query;
-
-        if (!name) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ error: "Provide ?name=filename" }));
-        }
-
-        const results = getFileInRepoByName(name);
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({
-            count: results.length,
-            files: results
-        }));
-    }
-
-    /* FIND PARTIAL */
-    if (parsedUrl.pathname === '/findByPartialFileName') {
-        const { name } = parsedUrl.query;
-
-        if (!name) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ error: "Provide ?name=partialName" }));
-        }
-
-        const results = findByPartialFileName(name);
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({
-            count: results.length,
-            files: results
-        }));
-    }
-
-    if (parsedUrl.pathname === '/readFilesContentInGitRepo' && req.method === 'POST') {
-        let body = '';
-
-        req.on('data', chunk => {
-            body += chunk.toString();
-        });
-
-        req.on('end', () => {
-
-            try {
-                const fileNames = JSON.parse(body);
-
-                if (!Array.isArray(fileNames) || fileNames.length === 0) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    return res.end(JSON.stringify({
-                        error: "Payload must be a non-empty array of file names"
-                    }));
-                }
-
-                const result = readFilesContentInGitRepoByNames(fileNames);
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                return res.end(JSON.stringify(result));
-
-            } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                return res.end(JSON.stringify({
-                    error: "Invalid JSON payload"
-                }));
-            }
-        });
-
-        return;
-    }
-
-    /* FIND CONTENT */
-    if (parsedUrl.pathname === '/findTextInFilesInGitRepo') {
-        const { text } = parsedUrl.query;
-
-        if (!text) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ error: "Provide ?text=searchText" }));
-        }
-
-        const results = findTextInFilesInGitRepo(text);
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({
-            search: text,
-            count: results.length,
+        return send(res, 200, {
+            searchText: text, totalFiles: results.length,
+            totalMatches: results.reduce((a, r) => a + r.matchCount, 0),
             results
-        }));
+        });
     }
 
-    /* 404 */
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Not Found' }));
+    /* ── POST /readFiles   body: ["/abs/path1", "/abs/path2"] ── */
+    /*   Batch read multiple files by absolute path              */
+    if (pathname === '/git/readFiles' && req.method === 'POST') {
+        let filePaths;
+        try { filePaths = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+        if (!Array.isArray(filePaths) || filePaths.length === 0) {
+            return err400(res, 'Body must be a non-empty array of file paths');
+        }
+
+        const result = {};
+        for (const fp of filePaths) {
+            const absPath = path.isAbsolute(fp) ? fp : path.join(BASE_DIR, fp);
+            if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+                result[fp] = { error: 'Not found' };
+            } else if (isBinary(absPath)) {
+                result[fp] = { error: 'Binary file' };
+            } else {
+                try { result[fp] = { content: fs.readFileSync(absPath, 'utf8') }; }
+                catch (e) { result[fp] = { error: e.message }; }
+            }
+        }
+        return send(res, 200, { count: filePaths.length, files: result });
+    }
+
+    /* ── GET /pull?repo=<name> ───────────────────────────────── */
+    if (pathname === '/git/pull') {
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        const repo = findRepo(query.repo);
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
+
+        try {
+            const output = await git(repo.path, 'pull');
+            return send(res, 200, await withRepoMeta(repo.path, { message: output }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── 404 ──────────────────────────────────────────────────── */
+    send(res, 404, {
+        error: 'Endpoint not found',
+        availableEndpoints: [
+            'GET  /health',
+            'GET  /git/repos',
+            'GET  /git/rescan',
+            'GET  /git/clone?url=',
+            'GET  /git/branches?repo=',
+            'POST /git/switch  { repo, branch }',
+            'GET  /git/tree?repo=',
+            'GET  /git/file?path=',
+            'GET  /git/filesByExtension?repo=&ext=',
+            'GET  /git/remoteUrl?repo=',
+            'GET  /git/log?repo=&branch=&limit=',
+            'GET  /git/status?repo=',
+            'GET  /git/findByName?repo=&name=',
+            'GET  /git/findByPartialName?repo=&name=',
+            'GET  /git/search?repo=&text=',
+            'POST /git/readFiles  ["/abs/path1", ...]',
+            'GET  /git/pull?repo='
+        ]
+    });
 });
 
 server.listen(PORT, () => {
-    console.log(`Git Explorer running at http://localhost:${PORT}`);
+    console.log(`Git Explorer v2.0 running at http://localhost:${PORT}`);
+    console.log('Endpoints: GET /health for full API listing');
 });
