@@ -107,10 +107,10 @@ Resources:
           for file in *.js; do if [ -f "$file" ]; then echo "Starting: $file"; node "$file" & fi; done
           for zip in *.zip; do 
             if [ -f "$zip" ]; then 
-              unzip -o "$zip" -d "${zip%.zip}" && \
-              cd "${zip%.zip}" && \
+              unzip -o "$zip" -d "$${zip%.zip}" && \
+              cd "$${zip%.zip}" && \
               if [ -f package.json ]; then 
-                echo "Running npm start in: ${zip%.zip}"; 
+                echo "Running npm start in: $${zip%.zip}"; 
                 npm start &
               fi
               cd ..
