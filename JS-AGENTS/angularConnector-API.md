@@ -1,6 +1,6 @@
 ANGULAR DEV API (http://localhost:3034)
 
-Wraps an Angular project with a REST API. On startup it resets routes to empty, clears app.component.html to <router-outlet />, then spawns `npm start` in the background, however the angular application runs n a non traditional port 3090, keep that in mind. All endpoints are JSON in/out.
+Wraps an Angular project with a REST API. On startup it resets routes to empty, clears app.component.html to <router-outlet />, then spawns `npm start` in the background. All endpoints are JSON in/out.
 
 ---
 
@@ -72,7 +72,7 @@ Sample Response (success):
   "message": "Component 'my-header' created successfully",
   "componentDir": "/project/src/app/my-header",
   "filesWritten": ["/project/src/app/my-header/my-header.ts", "..."],
-  "route": { "path": "myHeader", "component": "MyHeaderComponent", "urlToTest": "http://localhost:3090/myHeader" },
+  "route": { "path": "myHeader", "component": "MyHeaderComponent", "urlToTest": "http://localhost:4200/myHeader" },
   "errors": [],   // only present if individual file writes failed
   "logs": {
     "logFile": "angular-dev-2026-02-28_10-00-00.log",
@@ -81,7 +81,7 @@ Sample Response (success):
   }
 }
 
-if myHeader route is created the app can be accessed from http://localhost:3090/myHeader
+if myHeader route is created the app can be accessed from http://localhost:4200/myHeader
 
 Sample Response (route skipped):
 {
