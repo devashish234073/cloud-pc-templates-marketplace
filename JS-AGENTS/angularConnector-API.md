@@ -72,7 +72,7 @@ Sample Response (success):
   "message": "Component 'my-header' created successfully",
   "componentDir": "/project/src/app/my-header",
   "filesWritten": ["/project/src/app/my-header/my-header.ts", "..."],
-  "route": { "path": "myHeader", "component": "MyHeaderComponent", "urlToTest": "http://localhost:4200/myHeader" },
+  "route": { "path": "myHeader", "component": "MyHeaderComponent", "urlToTest": "http://localhost:3090/myHeader" },
   "errors": [],   // only present if individual file writes failed
   "logs": {
     "logFile": "angular-dev-2026-02-28_10-00-00.log",
@@ -81,7 +81,7 @@ Sample Response (success):
   }
 }
 
-if myHeader route is created the app can be accessed from http://localhost:4200/myHeader
+if myHeader route is created the app can be accessed from http://localhost:3090/myHeader
 
 Sample Response (route skipped):
 {

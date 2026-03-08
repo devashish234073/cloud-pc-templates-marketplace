@@ -150,7 +150,7 @@ console.log("Log file:", LOG_FILE_PATH);
 
 const logStream = fs.createWriteStream(LOG_FILE_PATH, { flags: 'a' });
 
-const angularProcess = spawn('npm', ['start'], {
+const angularProcess = spawn('npm', ['start', '--', '--port=3090'], {
     cwd: PROJECT_DIR,
     detached: true,  // gives Angular its own process group so we can kill -pid
     shell: true,
@@ -364,7 +364,7 @@ const server = http.createServer(async (req, res) => {
     if (parsedUrl.pathname === '/health' && req.method === 'GET') {
         return respond(200, {
             status: 'UP',
-            version: '1.0',
+            version: '2.0',
             type: 'agent',
             projectDir: PROJECT_DIR,
             routesFile: ROUTES_FILE || null,

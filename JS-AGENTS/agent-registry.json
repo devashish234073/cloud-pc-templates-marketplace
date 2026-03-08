@@ -46,7 +46,7 @@
     {
         "id": "angular connector",
         "name": "Angular Connector",
-        "currentVersion": "1.0",
+        "currentVersion": "2.0",
         "port": 3034,
         "description": "provides APIs to create angular component and register routes or check logs after running that.\nTo run first create an empty angular project in your machine by running 'ng new testApp'\nand then inside that testApp folder place this connector file and run it with\nnode <filename>",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector.js",
