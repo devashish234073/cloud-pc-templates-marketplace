@@ -15,6 +15,7 @@ RUN git clone https://github.com/devashish234073/cloud-pc-templates-marketplace
 
 # Expose agent ports
 EXPOSE 3000-3100
+EXPOSE 4200
 
 CMD bash -c '\
 cd /workspace/cloud-pc-templates-marketplace/JS-AGENTS && \
