@@ -150,12 +150,16 @@ console.log("Log file:", LOG_FILE_PATH);
 
 const logStream = fs.createWriteStream(LOG_FILE_PATH, { flags: 'a' });
 
-const angularProcess = spawn('npm', ['start', '--', '--port=3090'], {
-    cwd: PROJECT_DIR,
-    detached: true,  // gives Angular its own process group so we can kill -pid
-    shell: true,
-    stdio: ['ignore', 'pipe', 'pipe']
-});
+const angularProcess = spawn(
+    'npm',
+    ['start', '--', '--port=3090', '--host=0.0.0.0'],
+    {
+        cwd: PROJECT_DIR,
+        detached: true,
+        shell: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+    }
+);
 
 angularProcess.stdout.on('data', (data) => {
     logStream.write(`[STDOUT] ${data}`);
@@ -190,10 +194,10 @@ function shutdown(signal) {
     logStream.end(() => process.exit(0));
 }
 
-process.on('SIGINT',  () => shutdown('SIGINT'));   // Ctrl+C
+process.on('SIGINT', () => shutdown('SIGINT'));   // Ctrl+C
 process.on('SIGTERM', () => shutdown('SIGTERM'));  // kill <pid> / docker stop
 process.on('SIGQUIT', () => shutdown('SIGQUIT'));  // kill -3 / graceful quit
-process.on('SIGHUP',  () => shutdown('SIGHUP'));   // terminal closed
+process.on('SIGHUP', () => shutdown('SIGHUP'));   // terminal closed
 
 process.on('uncaughtException', (err) => {
     console.error('[uncaughtException]', err);
