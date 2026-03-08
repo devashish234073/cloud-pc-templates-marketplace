@@ -151,8 +151,8 @@ console.log("Log file:", LOG_FILE_PATH);
 const logStream = fs.createWriteStream(LOG_FILE_PATH, { flags: 'a' });
 
 const angularProcess = spawn(
-    'npm',
-    ['start', '--', '--port=4200', '--host=0.0.0.0', '--disable-host-check'],
+    'npx',
+    ['ng', 'serve', '--host=0.0.0.0', '--port=4200', '--disable-host-check'],
     {
         cwd: PROJECT_DIR,
         detached: true,
@@ -368,7 +368,7 @@ const server = http.createServer(async (req, res) => {
     if (parsedUrl.pathname === '/health' && req.method === 'GET') {
         return respond(200, {
             status: 'UP',
-            version: '2.0',
+            version: '3.0',
             type: 'agent',
             projectDir: PROJECT_DIR,
             routesFile: ROUTES_FILE || null,
