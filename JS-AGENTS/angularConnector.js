@@ -152,7 +152,7 @@ const logStream = fs.createWriteStream(LOG_FILE_PATH, { flags: 'a' });
 
 const angularProcess = spawn(
     'npx',
-    ['ng', 'serve', '--host=0.0.0.0', '--port=4200', '--disable-host-check'],
+    ['ng', 'serve', '--host=0.0.0.0', '--port=4200'],
     {
         cwd: PROJECT_DIR,
         detached: true,
