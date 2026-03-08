@@ -7,3 +7,5 @@ cd cloud-pc-templates
 docker build -t cloud-pc-templates-agents .
 docker run -p 3005-3050:3005-3050 -p 4200:4200 cloud-pc-templates-agents
 ```
+
+<img width="1391" height="715" alt="image" src="https://github.com/user-attachments/assets/24c73b6f-1ce1-4adf-be7e-3e0a75dd382d" />
