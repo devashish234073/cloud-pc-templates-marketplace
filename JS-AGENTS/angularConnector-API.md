@@ -1,6 +1,6 @@
 ANGULAR DEV API (http://localhost:3034)
 
-Wraps an Angular project with a REST API. On startup it resets routes to empty, clears app.component.html to <router-outlet />, then spawns `npm start` in the background. All endpoints are JSON in/out.
+Wraps an Angular project with a REST API. On startup it resets routes to empty, clears app.component.html to <router-outlet />, then spawns `npm start` in the background, however the angular application runs n a non traditional port 3090, keep that in mind. All endpoints are JSON in/out.
 
 ---
 
