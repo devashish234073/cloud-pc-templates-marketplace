@@ -57,7 +57,7 @@
     {
         "id": "selenium connector",
         "name": "Selenium Connector",
-        "currentVersion": "2.1",
+        "currentVersion": "3.0",
         "port": 3035,
         "risky": true,
         "risk": "This agent can run arbitrary selenium code, so use it at your own risk as if the llm can send risky code, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended code.",
