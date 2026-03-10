@@ -110,6 +110,7 @@ Resources:
               unzip -o "$zip" -d "$${zip%.zip}" && \
               cd "$${zip%.zip}" && \
               if [ -f package.json ]; then 
+                npm install
                 echo "Running npm start in: $${zip%.zip}"; 
                 npm start &
               fi
