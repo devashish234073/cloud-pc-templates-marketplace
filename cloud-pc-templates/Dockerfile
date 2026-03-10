@@ -8,6 +8,9 @@ RUN apt-get update && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs
 
+# NEW: install Angular CLI during build
+RUN npm install -g @angular/cli
+
 WORKDIR /workspace
 
 # Clone your repository
@@ -26,10 +29,14 @@ for file in *.js; do \
     if [ "$file" = "angularConnector.js" ]; then \
       echo "Detected angularConnector.js — setting up Angular project"; \
 
-      npm install -g @angular/cli; \
-      ng new angular-app --defaults --skip-git; \
+      if [ ! -d angular-app ]; then \
+        ng new angular-app --defaults --skip-git; \
+      fi; \
 
-      mv angularConnector.js angular-app/; \
+      if [ -f angularConnector.js ]; then \
+        mv angularConnector.js angular-app/; \
+      fi; \
+
       cd angular-app; \
 
       echo "Running angularConnector.js inside Angular project"; \
