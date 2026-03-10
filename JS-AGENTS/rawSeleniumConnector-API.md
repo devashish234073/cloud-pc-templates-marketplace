@@ -1,4 +1,4 @@
-Raw Selenium Connector — Agent API Docs
+Raw Selenium Connector - Agent API Docs
 
 Base URL: http://localhost:3035
 
@@ -24,8 +24,8 @@ Body: { "code": "<your nodejs selenium code as a string>" }
 5. The last statement MUST be: return results;
 6. Always populate the `results` variable with the data you want returned
 7. Always call await driver.quit() before returning
-8. Inside executeScript(), always use function() {} syntax — never arrow functions () =>
-9. Inside executeScript(), always use explicit return statements — never shorthand object returns
+8. Inside executeScript(), always use function() {} syntax - never arrow functions () =>
+9. Inside executeScript(), always use explicit return statements - never shorthand object returns
 
 ────────────────────────────────────────
 EXAMPLE PAYLOAD 1

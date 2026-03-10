@@ -233,7 +233,7 @@ Return the absolute paths of all files in a repo that match one or more file ext
 | Param | Required | Description |
 |-------|----------|-------------|
 | `repo` | Yes | Folder name of the repository |
-| `ext` | Yes | Single extension or comma-separated list — e.g. `js` or `js,ts,jsx` |
+| `ext` | Yes | Single extension or comma-separated list - e.g. `js` or `js,ts,jsx` |
 
 **Response**
 ```json
@@ -289,7 +289,7 @@ Return the commit history for a branch.
 
 | Param | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `repo` | Yes | — | Folder name of the repository |
+| `repo` | Yes | - | Folder name of the repository |
 | `branch` | No | `HEAD` | Branch name to read history from |
 | `limit` | No | `20` | Max commits to return (capped at 200) |
 
@@ -323,7 +323,7 @@ Return the commit history for a branch.
 ---
 
 ### GET `/git/status?repo=<repoName>`
-Return the working tree status — staged, unstaged, and untracked file changes.
+Return the working tree status - staged, unstaged, and untracked file changes.
 
 **Query Parameters**
 
@@ -515,6 +515,6 @@ Pull the latest changes from the remote for the currently checked-out branch.
 
 - **`repo` param is always the folder name** of the repository on disk, which is the key shown in `/git/repos` under `folderName`. It is not the GitHub repo name (though they are often the same).
 - **All file paths in responses are absolute** paths on the server's filesystem. Pass these directly back into `/git/file` or `/git/readFiles`.
-- **`repoName` vs `folderName`** — `repoName` is derived from the remote URL (e.g. the GitHub repo name). `folderName` is the local directory name. Use `folderName` when calling endpoints.
+- **`repoName` vs `folderName`** - `repoName` is derived from the remote URL (e.g. the GitHub repo name). `folderName` is the local directory name. Use `folderName` when calling endpoints.
 - **Binary files** (images, archives, executables, etc.) are excluded from all search and read operations.
-- **Excluded directories** — `node_modules`, `target`, `dist`, `build`, and all hidden directories (starting with `.`) are excluded from file tree, search, and extension scans.
+- **Excluded directories** - `node_modules`, `target`, `dist`, `build`, and all hidden directories (starting with `.`) are excluded from file tree, search, and extension scans.

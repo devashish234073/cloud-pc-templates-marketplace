@@ -23,7 +23,7 @@ const angularJsonPath = path.join(PROJECT_DIR, 'angular.json');
 const packageJsonPath = path.join(PROJECT_DIR, 'package.json');
 
 if (!fs.existsSync(angularJsonPath)) {
-    console.error("ERROR: Not an Angular project — angular.json not found in:", PROJECT_DIR);
+    console.error("ERROR: Not an Angular project - angular.json not found in:", PROJECT_DIR);
     process.exit(1);
 }
 
@@ -37,7 +37,7 @@ try {
     const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
     if (!deps['@angular/core']) {
-        console.error("ERROR: @angular/core not found in dependencies — not an Angular project.");
+        console.error("ERROR: @angular/core not found in dependencies - not an Angular project.");
         process.exit(1);
     }
     console.log("Angular project detected. Version:", deps['@angular/core']);
@@ -124,7 +124,7 @@ function findAppHtml(dir) {
 const APP_HTML = findAppHtml(PROJECT_DIR);
 
 if (!APP_HTML) {
-    console.warn("WARNING: Could not find app.component.html — skipping reset.");
+    console.warn("WARNING: Could not find app.component.html - skipping reset.");
 } else {
     console.log("App HTML found:", APP_HTML);
     try {
@@ -181,9 +181,9 @@ angularProcess.on('error', (err) => {
 
 console.log(`Angular process spawned (PID: ${angularProcess.pid})`);
 
-// Cleanup on server exit — kill Angular child process on any shutdown signal
+// Cleanup on server exit - kill Angular child process on any shutdown signal
 function shutdown(signal) {
-    console.log(`\n[${signal}] Shutting down — killing Angular process (PID: ${angularProcess.pid})...`);
+    console.log(`\n[${signal}] Shutting down - killing Angular process (PID: ${angularProcess.pid})...`);
     try {
         // Kill the entire process group to catch any child-of-child processes
         process.kill(-angularProcess.pid, 'SIGTERM');
@@ -209,7 +209,7 @@ process.on('unhandledRejection', (reason) => {
     shutdown('unhandledRejection');
 });
 
-// Last-resort: 'exit' event fires synchronously — do a hard kill here
+// Last-resort: 'exit' event fires synchronously - do a hard kill here
 // since async operations (like logStream.end) won't work at this point
 process.on('exit', () => {
     try { process.kill(-angularProcess.pid, 'SIGTERM'); } catch { }
@@ -290,7 +290,7 @@ function addRouteToFile(cleanRoute, cleanComponent, componentDir) {
         const isStandaloneRoutes = content.includes('export const routes') || content.includes('Routes = [');
         const isNgModule = content.includes('RouterModule.forRoot');
 
-        // Build import path — try to detect if Angular 19+ (no .component suffix)
+        // Build import path - try to detect if Angular 19+ (no .component suffix)
         const kebab = toKebabCase(cleanComponent.replace(/Component$/, ''));
         const relDir = componentDir
             ? './' + path.relative(path.dirname(ROUTES_FILE), componentDir).replace(/\\/g, '/')
@@ -504,7 +504,7 @@ const server = http.createServer(async (req, res) => {
 
         const safeName = componentName.trim();
 
-        // Run ng g c — capture stdout so we can parse which files were created
+        // Run ng g c - capture stdout so we can parse which files were created
         let ngOutput = '';
         try {
             console.log(`Generating component: ${safeName}`);
@@ -858,7 +858,7 @@ const server = http.createServer(async (req, res) => {
     /* -------- 5. ADD ROUTE (POST /routes) -------- */
     if (parsedUrl.pathname === '/routes' && req.method === 'POST') {
         if (!ROUTES_FILE) {
-            return respond(404, { error: 'Routes file not found — cannot add route' });
+            return respond(404, { error: 'Routes file not found - cannot add route' });
         }
 
         let body;

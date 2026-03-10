@@ -27,7 +27,7 @@ for file in *.js; do \
   if [ -f "$file" ]; then \
 
     if [ "$file" = "angularConnector.js" ]; then \
-      echo "Detected angularConnector.js — setting up Angular project"; \
+      echo "Detected angularConnector.js - setting up Angular project"; \
 
       if [ ! -d angular-app ]; then \
         ng new angular-app --defaults --skip-git; \

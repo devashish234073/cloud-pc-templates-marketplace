@@ -16,8 +16,8 @@ Content-Type: application/json
 
 Request body:
 {
-  "componentName": "my-header",           // required — kebab-case or camelCase
-  "fileTypes": ["ts", "html", "css"]     // optional — array of file types to retrieve (default: ["ts", "html", "css"])
+  "componentName": "my-header",           // required - kebab-case or camelCase
+  "fileTypes": ["ts", "html", "css"]     // optional - array of file types to retrieve (default: ["ts", "html", "css"])
                                          // accepted values: "ts", "html", "css"
 }
 
@@ -54,10 +54,10 @@ Content-Type: application/json
 
 Request body:
 {
-  "componentName": "my-header",      // required — kebab-case or camelCase
-  "ts": "...component class code...", // optional — full .ts file content
-  "html": "<h1>Hello</h1>",          // optional — full .html file content
-  "css": "h1 { color: red; }"        // optional — full .css/.scss file content
+  "componentName": "my-header",      // required - kebab-case or camelCase
+  "ts": "...component class code...", // optional - full .ts file content
+  "html": "<h1>Hello</h1>",          // optional - full .html file content
+  "css": "h1 { color: red; }"        // optional - full .css/.scss file content
 }
 
 Behavior notes:
@@ -107,16 +107,16 @@ Content-Type: application/json
 
 Request body:
 {
-  "componentName": "my-header",      // required — kebab-case or camelCase
-  "ts": "...component class code...", // optional — full .ts file content
-  "html": "<h1>Hello</h1>",          // optional — full .html file content
-  "css": "h1 { color: red; }"        // optional — full .css/.scss file content
+  "componentName": "my-header",      // required - kebab-case or camelCase
+  "ts": "...component class code...", // optional - full .ts file content
+  "html": "<h1>Hello</h1>",          // optional - full .html file content
+  "css": "h1 { color: red; }"        // optional - full .css/.scss file content
 }
 
 Behavior notes:
 - componentName is converted to kebab-case internally (myHeader -> my-header)
 - Component directory must exist; returns 404 if not found
-- Only provided files are updated (ts, html, css) — null/undefined fields are skipped
+- Only provided files are updated (ts, html, css) - null/undefined fields are skipped
 - templateUrl and styleUrl values inside the ts payload are automatically rewritten to match the actual existing filenames
 - Supports both Angular naming conventions: .component.ts and .ts, .component.html and .html, etc.
 - At least one file (ts, html, or css) must be provided for the update to succeed
@@ -174,8 +174,8 @@ Content-Type: application/json
 
 Request body:
 {
-  "route": "about",                  // required — URL path segment, leading slash optional
-  "componentName": "AboutComponent"  // required — PascalCase component class name
+  "route": "about",                  // required - URL path segment, leading slash optional
+  "componentName": "AboutComponent"  // required - PascalCase component class name
 }
 
 Behavior notes:
@@ -190,12 +190,12 @@ Sample Response (success):
   "addedRoute": { "path": "about", "component": "AboutComponent" }
 }
 Sample Response (already exists, 409): { "error": "Route 'about' already exists in routes file" }
-Sample Response (no routes file, 404): { "error": "Routes file not found — cannot add route" }
+Sample Response (no routes file, 404): { "error": "Routes file not found - cannot add route" }
 
 ---
 
 STARTUP SIDE EFFECTS (happen once before server begins listening)
-1. Validates angular.json and @angular/core exist — exits with error if not an Angular project
+1. Validates angular.json and @angular/core exist - exits with error if not an Angular project
 2. Locates routes file by scanning src/ for: app.routes.ts, app-routing.module.ts, app.routing.ts
 3. Overwrites routes file with clean empty state:
      import { Routes } from '@angular/router';

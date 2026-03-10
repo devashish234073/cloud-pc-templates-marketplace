@@ -17,7 +17,7 @@ Returns response like:
   "count": 5,
   "results": [
     {
-      "title": "Node.js — Download Node.js",
+      "title": "Node.js - Download Node.js",
       "url": "https://nodejs.org/en"
     },
     {
