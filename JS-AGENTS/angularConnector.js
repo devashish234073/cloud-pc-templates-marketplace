@@ -155,7 +155,7 @@ const angularProcess = spawn(
     ['ng', 'serve', '--host=0.0.0.0', '--port=4200'],
     {
         cwd: PROJECT_DIR,
-        detached: true,
+        //detached: true,
         shell: true,
         stdio: ['ignore', 'pipe', 'pipe']
     }
