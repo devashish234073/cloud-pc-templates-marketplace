@@ -34,7 +34,7 @@ for file in *.js; do \
       fi; \
 
       if [ -f angularConnector.js ]; then \
-        mv angularConnector.js angular-app/; \
+        cp angularConnector.js angular-app/; \
       fi; \
 
       cd angular-app; \
