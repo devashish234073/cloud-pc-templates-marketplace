@@ -1,15 +1,47 @@
-To run all the agents in docker, create anm image using the docker file and run that
+## Quick Start - Run Without Docker (One Command)
 
+Run the setup and start all agents with a single command:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/cloud-pc-templates/setup_and_run.sh)
 ```
+
+This will:
+- Install all system dependencies (Node.js 20.x, Angular CLI, git, curl, unzip)
+- Clone the repository
+- Start all JS agents on ports 3000-3100
+- Launch the Angular app on port 4200
+
+---
+
+## Alternative: Run Locally
+
+1. Clone the repository:
+```bash
 git clone https://github.com/devashish234073/cloud-pc-templates-marketplace
-cd cloud-pc-templates-marketplace
-cd cloud-pc-templates
+cd cloud-pc-templates-marketplace/cloud-pc-templates
+```
+
+2. Run the setup script:
+```bash
+./setup_and_run.sh
+```
+
+---
+
+## Run with Docker
+
+Create and run a Docker image using the Dockerfile:
+
+```bash
+git clone https://github.com/devashish234073/cloud-pc-templates-marketplace
+cd cloud-pc-templates-marketplace/cloud-pc-templates
 docker build -t cloud-pc-templates-agents .
 docker run -p 3005-3050:3005-3050 -p 4200:4200 cloud-pc-templates-agents
 ```
 
-OR RUN DIRECTLY FROM DOCKERHUB
-```
+Or run directly from DockerHub:
+```bash
 docker run -p 3005-3050:3005-3050 -p 4200:4200 devashish234073/cloud-pc-templates-agents
 ```
 
