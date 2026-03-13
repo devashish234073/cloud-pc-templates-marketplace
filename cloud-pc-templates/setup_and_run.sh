@@ -80,7 +80,7 @@ for file in *.js; do
             
             # Create Angular project if it doesn't exist
             if [ ! -d "angular-app" ]; then
-                ng new angular-app --defaults --skip-git
+                ng new angular-app --defaults --skip-git < /dev/null
             fi
             
             # Copy angularConnector.js to angular-app
