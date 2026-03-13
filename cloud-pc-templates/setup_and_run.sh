@@ -56,6 +56,9 @@ if [ ! -d "cloud-pc-templates-marketplace" ]; then
     echo "Repository cloned successfully"
 else
     echo "Repository already exists, skipping clone"
+    cd "cloud-pc-templates-marketplace"
+    git pull origin main
+    cd ..
 fi
 
 # Step 7: Navigate to JS-AGENTS directory
