@@ -6,7 +6,7 @@
 set -e  # Exit on any error
 
 echo "=========================================="
-echo "Cloud PC Templates Marketplace Setup"
+echo "Cloud PC Templates Agents Setup"
 echo "=========================================="
 
 # Check if running on Ubuntu/Debian
