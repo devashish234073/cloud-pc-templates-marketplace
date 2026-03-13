@@ -36,7 +36,13 @@ fi
 
 # Step 4: Install Angular CLI globally
 echo "Step 4: Installing Angular CLI globally..."
-sudo npm install -g @angular/cli
+if ! command -v ng &> /dev/null; then
+    echo "Angular CLI not found. Installing..."
+    npm install -g @angular/cli || sudo -E npm install -g @angular/cli
+    echo "Angular CLI installed successfully"
+else
+    echo "Angular CLI is already installed: $(ng version --minimal)"
+fi
 
 # Step 5: Create workspace directory
 echo "Step 5: Setting up workspace..."
