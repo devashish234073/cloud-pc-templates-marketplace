@@ -71,6 +71,9 @@ echo "=========================================="
 # Array to store background process PIDs
 declare -a PIDS
 
+# Disable Angular CLI analytics to avoid interactive prompt timeout
+export NG_CLI_ANALYTICS=false
+
 # Process all .js files
 for file in *.js; do
     if [ -f "$file" ]; then
@@ -79,7 +82,8 @@ for file in *.js; do
             
             # Create Angular project if it doesn't exist
             if [ ! -d "angular-app" ]; then
-                ng new angular-app --defaults --skip-git < /dev/null
+                # Use NG_CLI_ANALYTICS=false to skip the analytics prompt entirely
+                NG_CLI_ANALYTICS=false ng new angular-app --defaults --skip-git
             fi
             
             # Copy angularConnector.js to angular-app
