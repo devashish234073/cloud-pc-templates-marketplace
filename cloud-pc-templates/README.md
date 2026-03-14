@@ -45,6 +45,27 @@ Or run directly from DockerHub:
 docker run -p 3005-3050:3005-3050 -p 4200:4200 devashish234073/cloud-pc-templates-agents
 ```
 
+---
+
+## Run on Termux (Android)
+
+**One-liner to run everything on Android via Termux:**
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/cloud-pc-templates/setup_and_run_in_termux.sh)
+```
+
+Or locally after cloning:
+```bash
+bash setup_and_run_in_termux.sh
+```
+
+This will:
+- Install all dependencies via Termux's pkg package manager (Node.js, Angular CLI, git, curl, unzip)
+- Clone the repository
+- Start all JS agents on ports 3000-3100
+- Launch the Angular app on port 4200
+
 <img width="1391" height="715" alt="image" src="https://github.com/user-attachments/assets/24c73b6f-1ce1-4adf-be7e-3e0a75dd382d" />
 
 <img width="1764" height="829" alt="image" src="https://github.com/user-attachments/assets/aa1bb46b-0875-4e58-bb19-7362ea1de111" />
