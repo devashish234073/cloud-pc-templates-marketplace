@@ -42,7 +42,7 @@ if ! command -v ng &> /dev/null; then
     npm install -g @angular/cli || sudo -E npm install -g @angular/cli
     echo "Angular CLI installed successfully"
 else
-    echo "Angular CLI is already installed: $(ng version --minimal)"
+    echo "Angular CLI is already installed: $(ng version)"
 fi
 
 # Step 5: Create workspace directory
