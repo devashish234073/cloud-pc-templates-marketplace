@@ -15,14 +15,15 @@ if ! command -v apt-get &> /dev/null; then
     exit 1
 fi
 
-# Step 1: Update package manager
-echo "Step 1: Updating package manager..."
-sudo apt-get update
+if [ ! -d "cloud-pc-templates-marketplace" ]; then
+    # Step 1: Update package manager
+    echo "Step 1: Updating package manager..."
+    sudo apt-get update
 
-# Step 2: Install system dependencies
-echo "Step 2: Installing system dependencies..."
-sudo apt-get install -y curl git unzip ca-certificates
-
+    # Step 2: Install system dependencies
+    echo "Step 2: Installing system dependencies..."
+    sudo apt-get install -y curl git unzip ca-certificates
+fi
 # Step 3: Install Node.js 20.x (if not already installed)
 echo "Step 3: Checking Node.js installation..."
 if ! command -v node &> /dev/null; then
