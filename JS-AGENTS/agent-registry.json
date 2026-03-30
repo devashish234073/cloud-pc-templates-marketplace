@@ -83,7 +83,7 @@
   {
     "id": "mysql connector",
     "name": "MySQL Connector",
-    "currentVersion": "2.0",
+    "currentVersion": "3.0",
     "port": 3037,
     "risky": true,
     "risk": "This agent can run arbitrary sql code, so use it at your own risk as if the llm can send risky sql, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended queries.",
