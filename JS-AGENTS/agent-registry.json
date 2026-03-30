@@ -1,5 +1,42 @@
 [
     {
+        "id": "playwright connector",
+        "name": "Playwright Connector",
+        "currentVersion": "1.0",
+        "port": 3036,
+        "risky": true,
+        "risk": "This agent can run arbitrary Playwright code, so use it at your own risk as if the llm can send risky code, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended code.",
+        "description": "Provides api to execute arbitrary Playwright (Chromium) code. Exposes the same API as the Selenium Connector — use createDriver() in your code. To start: run npm install && npx playwright install chromium && npm start",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/rawPlaywrightConnector.zip",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/rawPlaywrightConnector-API.md",
+        "healthCheckUrl": "http://localhost:3036/health",
+        "fileName": "rawPlaywrightConnector.zip"
+    },
+    {
+        "id": "mysql connector",
+        "name": "MySQL Connector",
+        "currentVersion": "3.0",
+        "port": 3037,
+        "risky": true,
+        "risk": "This agent can run arbitrary sql code, so use it at your own risk as if the llm can send risky sql, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended queries.",
+        "description": "Provides api to execute sql code on a mysql database running locally. To start: download the zip unzip it and then inside the folder run npm install and npm start",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/sqlConnector.zip",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/sqlConnector-API.md",
+        "healthCheckUrl": "http://localhost:3037/health",
+        "fileName": "sqlConnector.zip"
+    },
+    {
+        "id": "angular connector",
+        "name": "Angular Connector",
+        "currentVersion": "3.0",
+        "port": 3034,
+        "description": "provides APIs to create angular component and register routes or check logs after running that.\nTo run first create an empty angular project in your machine by running 'ng new testApp'\nand then inside that testApp folder place this connector file and run it with\nnode <filename>",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector.js",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector-API.md",
+        "healthCheckUrl": "http://localhost:3034/health",
+        "fileName": "angularConnector.txt"
+    },
+    {
         "id": "file-explorer",
         "name": "File Explorer",
         "currentVersion": "1.0",
@@ -44,17 +81,6 @@
         "fileName": "webExplorerConnector.txt"
     },
     {
-        "id": "angular connector",
-        "name": "Angular Connector",
-        "currentVersion": "3.0",
-        "port": 3034,
-        "description": "provides APIs to create angular component and register routes or check logs after running that.\nTo run first create an empty angular project in your machine by running 'ng new testApp'\nand then inside that testApp folder place this connector file and run it with\nnode <filename>",
-        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector.js",
-        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/angularConnector-API.md",
-        "healthCheckUrl": "http://localhost:3034/health",
-        "fileName": "angularConnector.txt"
-    },
-    {
         "id": "selenium connector",
         "name": "Selenium Connector",
         "currentVersion": "3.0",
@@ -66,31 +92,5 @@
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/rawSeleniumConnector-API.md",
         "healthCheckUrl": "http://localhost:3035/health",
         "fileName": "rawSeleniumConnector.zip"
-    },
-    {
-    "id": "playwright connector",
-    "name": "Playwright Connector",
-    "currentVersion": "1.0",
-    "port": 3036,
-    "risky": true,
-    "risk": "This agent can run arbitrary Playwright code, so use it at your own risk as if the llm can send risky code, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended code.",
-    "description": "Provides api to execute arbitrary Playwright (Chromium) code. Exposes the same API as the Selenium Connector — use createDriver() in your code. To start: run npm install && npx playwright install chromium && npm start",
-    "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/rawPlaywrightConnector.zip",
-    "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/rawPlaywrightConnector-API.md",
-    "healthCheckUrl": "http://localhost:3036/health",
-    "fileName": "rawPlaywrightConnector.zip"
-  },
-  {
-    "id": "mysql connector",
-    "name": "MySQL Connector",
-    "currentVersion": "3.0",
-    "port": 3037,
-    "risky": true,
-    "risk": "This agent can run arbitrary sql code, so use it at your own risk as if the llm can send risky sql, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended queries.",
-    "description": "Provides api to execute sql code on a mysql database running locally. To start: download the zip unzip it and then inside the folder run npm install and npm start",
-    "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/sqlConnector.zip",
-    "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/sqlConnector-API.md",
-    "healthCheckUrl": "http://localhost:3037/health",
-    "fileName": "sqlConnector.zip"
-  }
+    }
 ]
