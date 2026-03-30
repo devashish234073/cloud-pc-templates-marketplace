@@ -3,6 +3,8 @@ SQL CONNECTOR API (http://localhost:3037)
 All credentials and database name are hardcoded server-side. No credentials or database details are passed in any request.
 Database in use: cloud_pc_templates_agent
 
+All endpoints always return HTTP 200. Errors are indicated by the presence of an "error" field in the response body, never by the HTTP status code.
+
 GET /health
 Returns: {"status":"UP","version":"1.0","type":"agent","service":"SQL Connector","port":3037}
 
@@ -48,11 +50,31 @@ Returns response like:
   "serverVersion": "8.0.39",
   "activeConnections": "3"
 }
+On failure returns HTTP 200 with an error field like:
+{
+  "error": "MySQL was not reachable and automatic setup also failed. Manual intervention required."
+}
+
+GET /mysql/create-user
+Creates the app user via sudo mysql (auth_socket) if it does not already exist.
+Useful when MySQL is already installed but the user has not been set up yet.
+Returns response like:
+{
+  "message": "User 'devas'@'localhost' created/verified successfully.",
+  "note": "GRANT ALL PRIVILEGES has been applied.",
+  "user": "devas"
+}
+On failure returns HTTP 200 with an error field like:
+{
+  "error": "Failed to create MySQL user",
+  "details": "..."
+}
 
 GET /mysql/query?q=SELECT+*+FROM+employee
 Runs a SQL query against the cloud_pc_templates_agent database. q is the only required param.
 To include spaces in the query use + or %20 (e.g. SELECT+*+FROM+employee or SELECT%20*%20FROM%20employee).
-First checks that the server is reachable, then executes the query via the mysql CLI.
+Always checks MySQL server reachability first before executing the query. If the server is not
+reachable the query will not run and an error is returned instead — run /mysql/setup-or-status first to fix this.
 Returns response like:
 {
   "query": "SELECT * FROM employee",
@@ -65,5 +87,13 @@ Returns response like:
     { "id": "2", "name": "Bob",   "email": "bob@example.com"   }
   ]
 }
-If the server is not reachable, returns HTTP 503 with an error and instructions to run /mysql/setup-or-status first.
-If the query fails (bad SQL, etc.), returns HTTP 400 with the error details.
+On failure always returns HTTP 200 with an error object like:
+{
+  "error": "Query execution failed",
+  "query": "CREATE TABLE ...",
+  "database": "cloud_pc_templates_agent",
+  "errorCode": "1064",
+  "sqlState": "42000",
+  "errorMessage": "ERROR 1064 (42000): You have an error in your SQL syntax...",
+  "hint": "SQL syntax error — check your query for typos or missing keywords."
+}
