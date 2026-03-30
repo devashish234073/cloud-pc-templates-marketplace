@@ -55,26 +55,10 @@ On failure returns HTTP 200 with an error field like:
   "error": "MySQL was not reachable and automatic setup also failed. Manual intervention required."
 }
 
-GET /mysql/create-user
-Creates the app user via sudo mysql (auth_socket) if it does not already exist.
-Useful when MySQL is already installed but the user has not been set up yet.
-Returns response like:
-{
-  "message": "User 'devas'@'localhost' created/verified successfully.",
-  "note": "GRANT ALL PRIVILEGES has been applied.",
-  "user": "devas"
-}
-On failure returns HTTP 200 with an error field like:
-{
-  "error": "Failed to create MySQL user",
-  "details": "..."
-}
-
 GET /mysql/query?q=SELECT+*+FROM+employee
 Runs a SQL query against the cloud_pc_templates_agent database. q is the only required param.
 To include spaces in the query use + or %20 (e.g. SELECT+*+FROM+employee or SELECT%20*%20FROM%20employee).
-Always checks MySQL server reachability first before executing the query. If the server is not
-reachable the query will not run and an error is returned instead — run /mysql/setup-or-status first to fix this.
+First checks that the server is reachable, then executes the query via the mysql CLI.
 Returns response like:
 {
   "query": "SELECT * FROM employee",
