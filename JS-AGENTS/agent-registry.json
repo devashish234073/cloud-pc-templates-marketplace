@@ -15,7 +15,7 @@
     {
         "id": "mysql connector",
         "name": "MySQL Connector",
-        "currentVersion": "7.0",
+        "currentVersion": "8.0",
         "port": 3037,
         "risky": true,
         "risk": "This agent can run arbitrary sql code, so use it at your own risk as if the llm can send risky sql, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended queries.",
@@ -23,6 +23,8 @@
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/sqlConnector.zip",
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/sqlConnector-API.md",
         "healthCheckUrl": "http://localhost:3037/health",
+        "insightUrl": "http://localhost:3037/mysql/query-metrics",
+        "setupUrl": "http://localhost:3037/mysql/setup-or-status",
         "fileName": "sqlConnector.zip"
     },
     {
