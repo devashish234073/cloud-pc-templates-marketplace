@@ -11,7 +11,7 @@ Note when creating components make sure to include proper imports needed for cod
 | `[ngClass]` / `[ngStyle]` | `CommonModule` |
 | `[(ngModel)]` | `FormsModule` |
 | `[formControl]` | `ReactiveFormsModule` |
-Every component created gets a separate path in the routes file, info of the same is returned in api response when creating component.
+Every component created gets a separate path in the routes file, info of the same is returned in api response when creating component. Always check logs after  component , creation/update and fix any errors before proceeding.
 ---
 
 GET /health
