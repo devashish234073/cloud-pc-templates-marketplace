@@ -294,6 +294,39 @@ function getLogs() {
     }
 }
 
+/* ------------------ HOMEPAGE LINK HELPER ------------------ */
+
+function addHomepageLink(routePath, label) {
+    if (!APP_HTML) return { error: 'app.component.html not found' };
+    try {
+        let html = fs.readFileSync(APP_HTML, 'utf8');
+        const link = `<a routerLink="/${routePath}">${label}</a>`;
+        // Avoid duplicates
+        if (html.includes(`routerLink="/${routePath}"`)) return { skipped: true };
+        // Insert the link before <router-outlet />
+        html = html.replace(/(<router-outlet\s*\/>)/, `${link}\n$1`);
+        fs.writeFileSync(APP_HTML, html, 'utf8');
+
+        // Ensure RouterLink is imported in app.component.ts
+        const appTs = APP_HTML.replace(/\.html$/, '.ts');
+        if (fs.existsSync(appTs)) {
+            let ts = fs.readFileSync(appTs, 'utf8');
+            if (!ts.includes('RouterLink')) {
+                // Add RouterLink to existing imports array or add a new import
+                if (ts.includes('RouterOutlet')) {
+                    ts = ts.replace('RouterOutlet', 'RouterOutlet, RouterLink');
+                } else {
+                    ts = `import { RouterLink } from '@angular/router';\n` + ts;
+                }
+                fs.writeFileSync(appTs, ts, 'utf8');
+            }
+        }
+        return { success: true, link };
+    } catch (e) {
+        return { error: e.message };
+    }
+}
+
 /* ------------------ ADD ROUTE HELPER ------------------ */
 
 function addRouteToFile(cleanRoute, cleanComponent, componentDir) {
@@ -679,6 +712,7 @@ const server = http.createServer(async (req, res) => {
             routeResult = addRouteToFile(camelRoute, pascalName, componentDir);
             if (routeResult.success) {
                 console.log(`Route '${camelRoute}' -> ${pascalName} registered in routes file.`);
+                addHomepageLink(camelRoute, pascalName.replace(/Component$/, ''));
             } else {
                 console.warn(`Route registration skipped: ${routeResult.error}`);
             }
