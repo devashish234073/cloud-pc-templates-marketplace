@@ -108,6 +108,21 @@ if (!ROUTES_FILE) {
     }
 }
 
+/* ------------------ COMPONENTS FOLDER SETUP ------------------ */
+
+const COMPONENTS_DIR = path.join(PROJECT_DIR, 'src', 'app', 'components');
+
+if (fs.existsSync(COMPONENTS_DIR)) {
+    // Empty the folder
+    for (const entry of fs.readdirSync(COMPONENTS_DIR)) {
+        fs.rmSync(path.join(COMPONENTS_DIR, entry), { recursive: true, force: true });
+    }
+    console.log('components folder emptied:', COMPONENTS_DIR);
+} else {
+    fs.mkdirSync(COMPONENTS_DIR, { recursive: true });
+    console.log('components folder created:', COMPONENTS_DIR);
+}
+
 /* ------------------ RESET APP HTML TO ROUTER OUTLET ------------------ */
 
 function findAppHtml(dir) {
@@ -234,16 +249,21 @@ function readBody(req) {
 }
 
 function getComponentDir(componentName) {
-    // ng g c creates components in src/app/<componentName>/
     const kebab = componentName
         .replace(/([A-Z])/g, (m, l, i) => (i === 0 ? l : '-' + l).toLowerCase())
-        .toLowerCase();
-    const srcApp = path.join(PROJECT_DIR, 'src', 'app', kebab);
-    if (fs.existsSync(srcApp)) return srcApp;
-    // fallback: try original name
-    const alt = path.join(PROJECT_DIR, 'src', 'app', componentName);
-    if (fs.existsSync(alt)) return alt;
-    return srcApp; // return expected path even if not yet created
+        .toLowerCase()
+        .replace(/component$/, '')
+        .replace(/-$/, '');
+    // Primary: src/app/components/<kebab>
+    const inComponents = path.join(COMPONENTS_DIR, kebab);
+    if (fs.existsSync(inComponents)) return inComponents;
+    // Fallback: src/app/<kebab> (legacy)
+    const inApp = path.join(PROJECT_DIR, 'src', 'app', kebab);
+    if (fs.existsSync(inApp)) return inApp;
+    // Fallback: original name in components dir
+    const altComponents = path.join(COMPONENTS_DIR, componentName);
+    if (fs.existsSync(altComponents)) return altComponents;
+    return inComponents; // return expected path even if not yet created
 }
 
 function toKebabCase(name) {
@@ -509,7 +529,7 @@ const server = http.createServer(async (req, res) => {
         try {
             console.log(`Generating component: ${safeName}`);
             ngOutput = execSync(
-                `npx ng g c ${safeName} --skip-tests`,
+                `npx ng g c ${safeName} --skip-tests --path src/app/components`,
                 { cwd: PROJECT_DIR, timeout: 30000 }
             ).toString();
             console.log(ngOutput);
@@ -545,7 +565,7 @@ const server = http.createServer(async (req, res) => {
         const kebab = toKebabCase(safeName);
         const componentDir = generatedFiles.ts
             ? path.dirname(generatedFiles.ts)
-            : path.join(PROJECT_DIR, 'src', 'app', kebab);
+            : path.join(COMPONENTS_DIR, kebab);
 
         if (!fs.existsSync(componentDir)) {
             return respond(500, {
