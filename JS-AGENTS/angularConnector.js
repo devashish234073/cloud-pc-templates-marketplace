@@ -299,29 +299,49 @@ function getLogs() {
 function addHomepageLink(routePath, label) {
     if (!APP_HTML) return { error: 'app.component.html not found' };
     try {
+        // --- Update HTML ---
         let html = fs.readFileSync(APP_HTML, 'utf8');
-        const link = `<a routerLink="/${routePath}">${label}</a>`;
-        // Avoid duplicates
-        if (html.includes(`routerLink="/${routePath}"`)) return { skipped: true };
-        // Insert the link before <router-outlet />
-        html = html.replace(/(<router-outlet\s*\/>)/, `${link}\n$1`);
-        fs.writeFileSync(APP_HTML, html, 'utf8');
+        const linkTag = '<a routerLink="/' + routePath + '">' + label + '</a>';
+        if (!html.includes('routerLink="/' + routePath + '"')) {
+            html = html.replace(/(<router-outlet[\s\S]*?\/?>)/, linkTag + '\n' + '$1');
+            fs.writeFileSync(APP_HTML, html, 'utf8');
+        }
 
-        // Ensure RouterLink is imported in app.component.ts
+        // --- Update app.component.ts ---
         const appTs = APP_HTML.replace(/\.html$/, '.ts');
-        if (fs.existsSync(appTs)) {
-            let ts = fs.readFileSync(appTs, 'utf8');
-            if (!ts.includes('RouterLink')) {
-                // Add RouterLink to existing imports array or add a new import
-                if (ts.includes('RouterOutlet')) {
-                    ts = ts.replace('RouterOutlet', 'RouterOutlet, RouterLink');
-                } else {
-                    ts = `import { RouterLink } from '@angular/router';\n` + ts;
-                }
-                fs.writeFileSync(appTs, ts, 'utf8');
+        if (!fs.existsSync(appTs)) return { success: true, link: linkTag };
+        let ts = fs.readFileSync(appTs, 'utf8');
+
+        // 1. Add RouterLink to the ES import from @angular/router
+        if (!ts.includes('RouterLink')) {
+            if (ts.includes('@angular/router')) {
+                // Append RouterLink inside the existing { ... } from @angular/router import
+                ts = ts.replace(/(from\s*['"]@angular\/router['"])/g, function(match) {
+                    return match;
+                });
+                ts = ts.replace(/(import\s*\{)([^}]+)(\}\s*from\s*['"]@angular\/router['"]\s*;)/, function(_, a, b, c) {
+                    return a + b.trimEnd() + ', RouterLink' + c;
+                });
+            } else {
+                ts = 'import { RouterLink } from \'@angular/router\';\n' + ts;
             }
         }
-        return { success: true, link };
+
+        // 2. Add RouterLink to the @Component imports array
+        if (!ts.includes('RouterLink')) {
+            // already handled above, skip
+        }
+        var hasInDecoratorImports = /imports\s*:\s*\[[^\]]*RouterLink/.test(ts);
+        if (!hasInDecoratorImports) {
+            ts = ts.replace(/(imports\s*:\s*\[)([^\]]*)(\])/, function(_, open, middle, close) {
+                var trimmed = middle.trimEnd();
+                var comma = (trimmed === '' || trimmed.endsWith(',')) ? '' : ',';
+                return open + trimmed + comma + ' RouterLink' + close;
+            });
+        }
+
+        fs.writeFileSync(appTs, ts, 'utf8');
+        return { success: true, link: linkTag };
     } catch (e) {
         return { error: e.message };
     }
