@@ -123,7 +123,7 @@ async function loadFullGlove(filePath) {
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
     console.log(`[glove] Downloading ${url}`);
-    console.log("[glove] (one-time ~330 MB download, cached afterwards)");
+    console.log("[glove] (one-time ~800 MB download, cached afterwards)");
 
     const file = fs.createWriteStream(dest);
     const get = (u) =>
