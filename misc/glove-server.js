@@ -82,12 +82,20 @@ function evaluateExpression(expr, model) {
 }
 
 // ── Similarity scorer ─────────────────────────────────────────────────────────
-function scoreWords(vector, candidates, model) {
+function scoreWords(vector, candidates, model, options = {}) {
+  const includeVectors = Boolean(options.includeVectors);
+
   return candidates
     .map((word) => {
       const w = word.toLowerCase().trim();
       if (!model.has(w)) return { word, inVocab: false, similarity: null };
-      return { word, inVocab: true, similarity: parseFloat(cosineSim(vector, model.get(w)).toFixed(6)) };
+      const embedding = model.get(w);
+      return {
+        word,
+        inVocab: true,
+        similarity: parseFloat(cosineSim(vector, embedding).toFixed(6)),
+        ...(includeVectors ? { vector: Array.from(embedding) } : {}),
+      };
     })
     .sort((a, b) => {
       if (!a.inVocab && !b.inVocab) return 0;
@@ -212,7 +220,7 @@ async function handleRequest(req, res) {
       return send(res, 400, { error: "Invalid JSON body." });
     }
 
-    const { expression, compareWith } = body;
+    const { expression, compareWith, includeVectors } = body;
 
     if (typeof expression !== "string" || !expression.trim())
       return send(res, 400, { error: "'expression' must be a non-empty string." });
@@ -233,12 +241,13 @@ async function handleRequest(req, res) {
       return send(res, err.status || 500, { error: err.message, ...(err.word ? { unknownWord: err.word } : {}) });
     }
 
-    const results = scoreWords(vector, compareWith, MODEL);
+    const results = scoreWords(vector, compareWith, MODEL, { includeVectors });
 
     return send(res, 200, {
       expression: expression.trim(),
       normalised: normExpr.trim(),
       wordsUsed,
+      ...(includeVectors ? { expressionVector: Array.from(vector) } : {}),
       results,
     });
   }
