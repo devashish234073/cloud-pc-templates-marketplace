@@ -93,6 +93,211 @@ Create a new Maven project via `mvn archetype:generate`.
 
 ---
 
+### `POST /spring/create`
+
+Create a configurable Spring Boot Maven application without relying on an archetype.
+
+It generates:
+- `pom.xml` from caller-supplied Maven metadata
+- application class
+- `/api/health` controller
+- `application.properties`
+- basic context-load test
+- `.gitignore`
+- `README.md`
+
+**Body:**
+```json
+{
+  "groupId": "com.example",
+  "artifactId": "inventory-api",
+  "packageName": "com.example.inventory",
+  "appName": "InventoryApi",
+  "version": "0.0.1-SNAPSHOT",
+  "parent": {
+    "groupId": "org.springframework.boot",
+    "artifactId": "spring-boot-starter-parent",
+    "version": "3.3.5",
+    "relativePath": ""
+  },
+  "properties": {
+    "java.version": "17"
+  },
+  "dependencies": [
+    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-web" },
+    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-test", "scope": "test" }
+  ],
+  "plugins": [
+    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-maven-plugin" }
+  ],
+  "applicationProperties": {
+    "server.port": "8080"
+  }
+}
+```
+
+| Field | Required | Default |
+|---|---|---|
+| `groupId` | ✅ | – |
+| `artifactId` | ✅ | – |
+| `packageName` | | sanitized from `groupId.artifactId` |
+| `appName` | | PascalCase from `artifactId` |
+| `version` | | `0.0.1-SNAPSHOT` |
+| `parent` | | none |
+| `properties` | | `{}` |
+| `dependencies` | | `[]` |
+| `plugins` | | `[]` |
+| `applicationProperties` | | `{}` |
+
+No dependency names are hardcoded. The caller must pass exact Maven coordinates. Dependency objects support `groupId`, `artifactId`, `version`, `type`, `classifier`, `scope`, `optional`, and `exclusions`.
+
+Plugin objects support `groupId`, `artifactId`, `version`, `extensions`, `configuration`, `configurationXml`, `executions`, `executionsXml`, or `rawXml`.
+
+**Response 200:**
+```json
+{
+  "message": "Spring Boot project 'inventory-api' created successfully",
+  "project": {
+    "name": "inventory-api",
+    "path": "/base/inventory-api",
+    "groupId": "com.example",
+    "artifactId": "inventory-api",
+    "packageName": "com.example.inventory",
+    "type": "spring-boot",
+    "createdAt": "..."
+  },
+  "applicationClass": "com.example.inventory.InventoryApiApplication",
+  "dependencies": [
+    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-web" }
+  ],
+  "plugins": [
+    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-maven-plugin" }
+  ],
+  "files": ["/base/inventory-api/pom.xml"]
+}
+```
+
+**Response 409:** Project or directory already exists.
+
+---
+
+### `POST /spring/crud?projectName=`
+
+Generate a complete CRUD resource inside a Spring Boot project.
+
+It creates:
+- JPA entity
+- request/response DTOs
+- Spring Data repository
+- service with transactions and 404 handling
+- REST controller with list/get/create/update/delete routes
+
+**Query:** `?projectName=inventory-api`
+
+**Body:**
+```json
+{
+  "resourceName": "Product",
+  "packageName": "com.example.inventory",
+  "path": "products",
+  "fields": [
+    { "name": "name", "type": "String", "required": true },
+    { "name": "price", "type": "BigDecimal", "required": true },
+    { "name": "sku", "type": "String", "unique": true }
+  ]
+}
+```
+
+| Field | Required | Default |
+|---|---|---|
+| `resourceName` | ✅ | – |
+| `packageName` | | project `packageName`, project `groupId`, or `com.example.demo` |
+| `path` | | plural kebab-case from `resourceName` |
+| `fields` | | `name` and `description` |
+
+Common supported field types include `String`, `Integer`, `Long`, `Double`, `BigDecimal`, `Boolean`, `LocalDate`, `LocalDateTime`, and `UUID`.
+
+**Response 200:**
+```json
+{
+  "message": "CRUD resource 'Product' generated successfully",
+  "projectName": "inventory-api",
+  "packageName": "com.example.inventory",
+  "resourceName": "Product",
+  "endpoints": [
+    "GET    /api/products",
+    "GET    /api/products/{id}",
+    "POST   /api/products",
+    "PUT    /api/products/{id}",
+    "DELETE /api/products/{id}"
+  ],
+  "fields": [
+    { "name": "name", "type": "String", "required": true, "unique": false }
+  ],
+  "files": [
+    { "file": "/base/inventory-api/src/main/java/com/example/inventory/entity/Product.java", "overwritten": false }
+  ]
+}
+```
+
+---
+
+### `GET /maven/pom?projectName=&raw=true`
+
+Read structured POM information, including parent, properties, dependencies, and plugins. Add `raw=true` to include the full `pom.xml`.
+
+**Response 200:**
+```json
+{
+  "projectName": "inventory-api",
+  "pomPath": "/base/inventory-api/pom.xml",
+  "summary": {
+    "groupId": "com.example",
+    "artifactId": "inventory-api",
+    "version": "0.0.1-SNAPSHOT",
+    "parent": { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-parent", "version": "3.3.5" },
+    "properties": { "java.version": "17" },
+    "dependencies": [],
+    "plugins": []
+  },
+  "rawXml": "<project>...</project>"
+}
+```
+
+---
+
+### `PUT /maven/properties?projectName=`
+
+Add or update POM properties.
+
+**Body:**
+```json
+{
+  "properties": {
+    "java.version": "21",
+    "spring-cloud.version": "2023.0.3"
+  }
+}
+```
+
+---
+
+### `PUT /maven/parent?projectName=`
+
+Add or update the POM parent.
+
+**Body:**
+```json
+{
+  "groupId": "org.springframework.boot",
+  "artifactId": "spring-boot-starter-parent",
+  "version": "3.3.5",
+  "relativePath": ""
+}
+```
+
+---
+
 ### `POST /maven/class?projectName=&packageName=&className=`
 
 Create (or overwrite) a Java class.
@@ -145,7 +350,13 @@ Add or update a dependency in `pom.xml`.
   "groupId": "org.springframework.boot",
   "artifactId": "spring-boot-starter-web",
   "version": "3.2.0",
-  "scope": "compile"
+  "type": "jar",
+  "classifier": "",
+  "scope": "compile",
+  "optional": false,
+  "exclusions": [
+    { "groupId": "commons-logging", "artifactId": "commons-logging" }
+  ]
 }
 ```
 
@@ -154,7 +365,11 @@ Add or update a dependency in `pom.xml`.
 | `groupId` | ✅ |
 | `artifactId` | ✅ |
 | `version` | |
+| `type` | |
+| `classifier` | |
 | `scope` | |
+| `optional` | |
+| `exclusions` | |
 
 If the dependency already exists (same `groupId:artifactId`), its version/scope is **updated**.
 
@@ -167,6 +382,22 @@ If the dependency already exists (same `groupId:artifactId`), its version/scope 
   "groupId": "org.springframework.boot",
   "artifactId": "spring-boot-starter-web",
   "version": "3.2.0"
+}
+```
+
+---
+
+### `POST /maven/dependencies?projectName=`
+
+Add or update multiple dependencies.
+
+**Body:**
+```json
+{
+  "dependencies": [
+    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-web" },
+    { "groupId": "org.projectlombok", "artifactId": "lombok", "version": "1.18.34", "scope": "provided", "optional": true }
+  ]
 }
 ```
 
@@ -190,6 +421,57 @@ Also attempts `mvn dependency:list` for resolved (effective) versions.
   ]
 }
 ```
+
+---
+
+### `GET /maven/plugins?projectName=`
+
+List build plugins from `pom.xml`, including raw plugin XML and parsed configuration/executions XML where present.
+
+**Response 200:**
+```json
+{
+  "projectName": "my-app",
+  "count": 1,
+  "plugins": [
+    {
+      "groupId": "org.springframework.boot",
+      "artifactId": "spring-boot-maven-plugin",
+      "version": null,
+      "configurationXml": null,
+      "executionsXml": null
+    }
+  ]
+}
+```
+
+---
+
+### `POST /maven/plugin?projectName=`
+
+Add or update a build plugin. If the same `groupId:artifactId` already exists, it is replaced.
+
+**Body:**
+```json
+{
+  "groupId": "org.apache.maven.plugins",
+  "artifactId": "maven-compiler-plugin",
+  "version": "3.13.0",
+  "configuration": {
+    "source": "21",
+    "target": "21"
+  },
+  "executions": [
+    {
+      "id": "default-compile",
+      "phase": "compile",
+      "goals": ["compile"]
+    }
+  ]
+}
+```
+
+For complex plugin XML, pass `configurationXml`, `executionsXml`, or `rawXml`.
 
 ---
 

@@ -305,8 +305,20 @@ function parseDependencies(pomPath) {
         const gid = (block.match(/<groupId>([^<]+)<\/groupId>/) || [])[1] || '';
         const aid = (block.match(/<artifactId>([^<]+)<\/artifactId>/) || [])[1] || '';
         const ver = (block.match(/<version>([^<]+)<\/version>/) || [])[1] || '';
+        const type = (block.match(/<type>([^<]+)<\/type>/) || [])[1] || null;
+        const classifier = (block.match(/<classifier>([^<]+)<\/classifier>/) || [])[1] || null;
         const scope = (block.match(/<scope>([^<]+)<\/scope>/) || [])[1] || null;
-        deps.push({ groupId: gid.trim(), artifactId: aid.trim(), version: ver.trim() || null, scope });
+        const optional = (block.match(/<optional>([^<]+)<\/optional>/) || [])[1] || null;
+        deps.push({
+            groupId: gid.trim(),
+            artifactId: aid.trim(),
+            version: ver.trim() || null,
+            type: type ? type.trim() : null,
+            classifier: classifier ? classifier.trim() : null,
+            scope: scope ? scope.trim() : null,
+            optional: optional ? optional.trim() === 'true' : null,
+            rawXml: block.trim()
+        });
     }
     return deps;
 }
@@ -315,14 +327,11 @@ function parseDependencies(pomPath) {
  * Add a dependency to pom.xml.
  * If the dependency already exists (same groupId:artifactId), its version is updated.
  */
-function addDependencyToPom(pomPath, groupId, artifactId, version, scope) {
+function addDependencyToPom(pomPath, groupId, artifactId, version, scope, options = {}) {
     let content = fs.readFileSync(pomPath, 'utf8');
+    const dependency = { groupId, artifactId, version, scope, ...options };
 
-    // Build dependency XML block
-    let depBlock = `    <dependency>\n      <groupId>${groupId}</groupId>\n      <artifactId>${artifactId}</artifactId>`;
-    if (version) depBlock += `\n      <version>${version}</version>`;
-    if (scope) depBlock += `\n      <scope>${scope}</scope>`;
-    depBlock += `\n    </dependency>`;
+    const depBlock = renderDependencyBlock(dependency, 4);
 
     // Check if dependency already exists
     const existingRegex = new RegExp(
@@ -350,8 +359,432 @@ function addDependencyToPom(pomPath, groupId, artifactId, version, scope) {
     return { action: 'added', groupId, artifactId, version };
 }
 
+function xmlTag(name, value, indent) {
+    if (value === undefined || value === null || value === '') return '';
+    return `${' '.repeat(indent)}<${name}>${xmlEscape(value)}</${name}>\n`;
+}
+
+function renderXmlNode(name, value, indent) {
+    const pad = ' '.repeat(indent);
+    if (value === undefined || value === null) return '';
+    if (Array.isArray(value)) {
+        return value.map(item => renderXmlNode(name, item, indent)).join('');
+    }
+    if (typeof value === 'object') {
+        const children = Object.entries(value)
+            .map(([key, child]) => renderXmlNode(key, child, indent + 2))
+            .join('');
+        return `${pad}<${name}>\n${children}${pad}</${name}>\n`;
+    }
+    return `${pad}<${name}>${xmlEscape(value)}</${name}>\n`;
+}
+
+function renderDependencyBlock(dep, indent = 4) {
+    if (dep.rawXml) return dep.rawXml.trim().split('\n').map(line => `${' '.repeat(indent)}${line}`).join('\n');
+    let xml = `${' '.repeat(indent)}<dependency>\n`;
+    xml += xmlTag('groupId', dep.groupId, indent + 2);
+    xml += xmlTag('artifactId', dep.artifactId, indent + 2);
+    xml += xmlTag('version', dep.version, indent + 2);
+    xml += xmlTag('type', dep.type, indent + 2);
+    xml += xmlTag('classifier', dep.classifier, indent + 2);
+    xml += xmlTag('scope', dep.scope, indent + 2);
+    if (dep.optional !== undefined && dep.optional !== null) xml += xmlTag('optional', dep.optional ? 'true' : 'false', indent + 2);
+    if (Array.isArray(dep.exclusions) && dep.exclusions.length) {
+        xml += `${' '.repeat(indent + 2)}<exclusions>\n`;
+        for (const exclusion of dep.exclusions) {
+            xml += `${' '.repeat(indent + 4)}<exclusion>\n`;
+            xml += xmlTag('groupId', exclusion.groupId, indent + 6);
+            xml += xmlTag('artifactId', exclusion.artifactId, indent + 6);
+            xml += `${' '.repeat(indent + 4)}</exclusion>\n`;
+        }
+        xml += `${' '.repeat(indent + 2)}</exclusions>\n`;
+    }
+    xml += `${' '.repeat(indent)}</dependency>`;
+    return xml;
+}
+
+function renderPluginBlock(plugin, indent = 6) {
+    if (plugin.rawXml) return plugin.rawXml.trim().split('\n').map(line => `${' '.repeat(indent)}${line}`).join('\n');
+    let xml = `${' '.repeat(indent)}<plugin>\n`;
+    xml += xmlTag('groupId', plugin.groupId, indent + 2);
+    xml += xmlTag('artifactId', plugin.artifactId, indent + 2);
+    xml += xmlTag('version', plugin.version, indent + 2);
+    if (plugin.extensions !== undefined && plugin.extensions !== null) xml += xmlTag('extensions', plugin.extensions ? 'true' : 'false', indent + 2);
+    if (plugin.configurationXml) {
+        xml += plugin.configurationXml.trim().split('\n').map(line => `${' '.repeat(indent + 2)}${line}`).join('\n') + '\n';
+    } else if (plugin.configuration) {
+        xml += renderXmlNode('configuration', plugin.configuration, indent + 2);
+    }
+    if (plugin.executionsXml) {
+        xml += plugin.executionsXml.trim().split('\n').map(line => `${' '.repeat(indent + 2)}${line}`).join('\n') + '\n';
+    } else if (Array.isArray(plugin.executions) && plugin.executions.length) {
+        xml += `${' '.repeat(indent + 2)}<executions>\n`;
+        for (const execution of plugin.executions) {
+            xml += `${' '.repeat(indent + 4)}<execution>\n`;
+            xml += xmlTag('id', execution.id, indent + 6);
+            xml += xmlTag('phase', execution.phase, indent + 6);
+            if (Array.isArray(execution.goals) && execution.goals.length) {
+                xml += `${' '.repeat(indent + 6)}<goals>\n`;
+                for (const goal of execution.goals) xml += xmlTag('goal', goal, indent + 8);
+                xml += `${' '.repeat(indent + 6)}</goals>\n`;
+            }
+            if (execution.configurationXml) {
+                xml += execution.configurationXml.trim().split('\n').map(line => `${' '.repeat(indent + 6)}${line}`).join('\n') + '\n';
+            } else if (execution.configuration) {
+                xml += renderXmlNode('configuration', execution.configuration, indent + 6);
+            }
+            xml += `${' '.repeat(indent + 4)}</execution>\n`;
+        }
+        xml += `${' '.repeat(indent + 2)}</executions>\n`;
+    }
+    xml += `${' '.repeat(indent)}</plugin>`;
+    return xml;
+}
+
+function parseXmlSection(content, tagName) {
+    const match = content.match(new RegExp(`<${tagName}>([\\s\\S]*?)</${tagName}>`));
+    return match ? match[1].trim() : null;
+}
+
+function parseSimpleTags(block) {
+    const obj = {};
+    if (!block) return obj;
+    const tagRegex = /<([A-Za-z0-9_.-]+)>([^<]*)<\/\1>/g;
+    let match;
+    while ((match = tagRegex.exec(block)) !== null) {
+        obj[match[1]] = match[2].trim();
+    }
+    return obj;
+}
+
+function parsePlugins(pomPath) {
+    const content = fs.readFileSync(pomPath, 'utf8');
+    const plugins = [];
+    const pluginRegex = /<plugin>\s*([\s\S]*?)\s*<\/plugin>/g;
+    let match;
+    while ((match = pluginRegex.exec(content)) !== null) {
+        const block = match[1];
+        plugins.push({
+            groupId: ((block.match(/<groupId>([^<]+)<\/groupId>/) || [])[1] || '').trim() || null,
+            artifactId: ((block.match(/<artifactId>([^<]+)<\/artifactId>/) || [])[1] || '').trim() || null,
+            version: ((block.match(/<version>([^<]+)<\/version>/) || [])[1] || '').trim() || null,
+            configurationXml: parseXmlSection(block, 'configuration'),
+            executionsXml: parseXmlSection(block, 'executions'),
+            rawXml: block.trim()
+        });
+    }
+    return plugins;
+}
+
+function parsePomSummary(pomPath) {
+    const content = fs.readFileSync(pomPath, 'utf8');
+    const projectHeader = content
+        .replace(/<parent>[\s\S]*?<\/parent>/g, '')
+        .replace(/<dependencies>[\s\S]*?<\/dependencies>/g, '')
+        .replace(/<build>[\s\S]*?<\/build>/g, '');
+    const parentBlock = parseXmlSection(content, 'parent');
+    return {
+        modelVersion: ((content.match(/<modelVersion>([^<]+)<\/modelVersion>/) || [])[1] || '').trim() || null,
+        groupId: ((projectHeader.match(/<groupId>([^<]+)<\/groupId>/) || [])[1] || '').trim() || null,
+        artifactId: ((projectHeader.match(/<artifactId>([^<]+)<\/artifactId>/) || [])[1] || '').trim() || null,
+        version: ((projectHeader.match(/<version>([^<]+)<\/version>/) || [])[1] || '').trim() || null,
+        packaging: ((content.match(/<packaging>([^<]+)<\/packaging>/) || [])[1] || '').trim() || null,
+        name: ((content.match(/<name>([^<]+)<\/name>/) || [])[1] || '').trim() || null,
+        description: ((content.match(/<description>([^<]+)<\/description>/) || [])[1] || '').trim() || null,
+        parent: parentBlock ? parseSimpleTags(parentBlock) : null,
+        properties: parseSimpleTags(parseXmlSection(content, 'properties')),
+        dependencies: parseDependencies(pomPath),
+        plugins: parsePlugins(pomPath)
+    };
+}
+
+function upsertPropertiesInPom(pomPath, properties) {
+    let content = fs.readFileSync(pomPath, 'utf8');
+    let propsBlock = parseXmlSection(content, 'properties');
+    if (propsBlock === null) {
+        const rendered = `  <properties>\n${Object.entries(properties).map(([key, value]) => xmlTag(key, value, 4)).join('')}  </properties>`;
+        content = content.replace('</project>', `${rendered}\n</project>`);
+    } else {
+        for (const [key, value] of Object.entries(properties)) {
+            const tagRegex = new RegExp(`<${escapeRegex(key)}>[^<]*</${escapeRegex(key)}>`);
+            const tag = xmlTag(key, value, 4).trim();
+            if (tagRegex.test(propsBlock)) {
+                propsBlock = propsBlock.replace(tagRegex, tag);
+            } else {
+                propsBlock += `\n${tag}`;
+            }
+        }
+        content = content.replace(/<properties>[\s\S]*?<\/properties>/, `<properties>\n${propsBlock.trim()}\n  </properties>`);
+    }
+    fs.writeFileSync(pomPath, content, 'utf8');
+}
+
+function upsertParentInPom(pomPath, parent) {
+    let content = fs.readFileSync(pomPath, 'utf8');
+    const parentBlock = `  <parent>\n${xmlTag('groupId', parent.groupId, 4)}${xmlTag('artifactId', parent.artifactId, 4)}${xmlTag('version', parent.version, 4)}${xmlTag('relativePath', parent.relativePath, 4)}  </parent>`;
+    if (content.match(/<parent>[\s\S]*?<\/parent>/)) {
+        content = content.replace(/<parent>[\s\S]*?<\/parent>/, parentBlock.trim());
+    } else if (content.includes('</modelVersion>')) {
+        content = content.replace('</modelVersion>', `</modelVersion>\n\n${parentBlock}`);
+    } else if (content.includes('<project')) {
+        content = content.replace(/(<project[^>]*>)/, `$1\n${parentBlock}`);
+    } else {
+        return { error: 'Could not find insertion point in pom.xml' };
+    }
+    fs.writeFileSync(pomPath, content, 'utf8');
+    return { action: 'updated', parent };
+}
+
+function upsertPluginInPom(pomPath, plugin) {
+    let content = fs.readFileSync(pomPath, 'utf8');
+    const groupId = plugin.groupId || 'org.apache.maven.plugins';
+    const artifactId = plugin.artifactId;
+    if (!artifactId && !plugin.rawXml) return { error: 'Provide plugin artifactId or rawXml' };
+    const block = renderPluginBlock({ ...plugin, groupId }, 6);
+    const existingRegex = new RegExp(
+        `<plugin>\\s*(?:<groupId>\\s*${escapeRegex(groupId)}\\s*</groupId>\\s*)?<artifactId>\\s*${escapeRegex(artifactId)}\\s*</artifactId>[\\s\\S]*?</plugin>`,
+        'g'
+    );
+
+    if (artifactId && existingRegex.test(content)) {
+        content = content.replace(existingRegex, block);
+        fs.writeFileSync(pomPath, content, 'utf8');
+        return { action: 'updated', groupId, artifactId };
+    }
+
+    if (content.includes('</plugins>')) {
+        content = content.replace('</plugins>', `${block}\n    </plugins>`);
+    } else if (content.includes('</build>')) {
+        content = content.replace('</build>', `    <plugins>\n${block}\n    </plugins>\n  </build>`);
+    } else if (content.includes('</project>')) {
+        content = content.replace('</project>', `  <build>\n    <plugins>\n${block}\n    </plugins>\n  </build>\n</project>`);
+    } else {
+        return { error: 'Could not find insertion point in pom.xml' };
+    }
+
+    fs.writeFileSync(pomPath, content, 'utf8');
+    return { action: 'added', groupId, artifactId };
+}
+
 function escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/* ================================================================
+   SPRING BOOT APP SCAFFOLDING HELPERS
+   ================================================================ */
+
+function xmlEscape(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
+
+function toPascalCase(value) {
+    return String(value || '')
+        .replace(/[^a-zA-Z0-9]+/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join('');
+}
+
+function toCamelCase(value) {
+    const pascal = toPascalCase(value);
+    return pascal ? pascal.charAt(0).toLowerCase() + pascal.slice(1) : '';
+}
+
+function toKebabCase(value) {
+    return String(value || '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+        .replace(/[^a-zA-Z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase();
+}
+
+function pluralizeKebab(value) {
+    const kebab = toKebabCase(value);
+    if (!kebab) return '';
+    return kebab.endsWith('s') ? kebab : `${kebab}s`;
+}
+
+function isValidJavaIdentifier(value) {
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(value);
+}
+
+function isValidPackageName(value) {
+    return /^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*)*$/.test(value);
+}
+
+function sanitizePackageName(value) {
+    const cleaned = String(value || 'com.example.demo')
+        .toLowerCase()
+        .replace(/[^a-z0-9_.]+/g, '.')
+        .replace(/\.+/g, '.')
+        .replace(/^\.+|\.+$/g, '');
+    const parts = cleaned.split('.')
+        .filter(Boolean)
+        .map(part => /^[a-z_$]/.test(part) ? part : `app${part}`);
+    const pkg = parts.join('.') || 'com.example.demo';
+    return isValidPackageName(pkg) ? pkg : 'com.example.demo';
+}
+
+function javaPackageDir(projectPath, packageName, suffix = '') {
+    const packagePath = packageName.replace(/\./g, path.sep);
+    return path.join(projectPath, 'src', 'main', 'java', packagePath, suffix);
+}
+
+function javaTestPackageDir(projectPath, packageName) {
+    return path.join(projectPath, 'src', 'test', 'java', packageName.replace(/\./g, path.sep));
+}
+
+function writeTextFile(filePath, content) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content, 'utf8');
+    return filePath;
+}
+
+function normalizeDependencies(dependencies) {
+    if (!Array.isArray(dependencies)) return [];
+    return dependencies.map(dep => {
+        if (typeof dep === 'string') {
+            const parts = dep.split(':');
+            return { groupId: parts[0], artifactId: parts[1], version: parts[2], scope: parts[3] };
+        }
+        return dep;
+    }).filter(dep => dep && (dep.rawXml || (dep.groupId && dep.artifactId)));
+}
+
+function normalizePlugins(plugins) {
+    if (!Array.isArray(plugins)) return [];
+    return plugins.filter(plugin => plugin && (plugin.rawXml || plugin.artifactId));
+}
+
+function renderPropertiesBlock(properties) {
+    const entries = Object.entries(properties || {});
+    if (!entries.length) return '';
+    return `\n  <properties>\n${entries.map(([key, value]) => xmlTag(key, value, 4)).join('')}  </properties>\n`;
+}
+
+function renderSpringPom({ groupId, artifactId, version, packaging, appName, description, parent, properties, dependencies, plugins }) {
+    const dependencyXml = normalizeDependencies(dependencies).map(dep => renderDependencyBlock(dep, 4)).join('\n');
+    const pluginXml = normalizePlugins(plugins).map(plugin => renderPluginBlock(plugin, 6)).join('\n');
+    const parentXml = parent ? `\n  <parent>\n${xmlTag('groupId', parent.groupId, 4)}${xmlTag('artifactId', parent.artifactId, 4)}${xmlTag('version', parent.version, 4)}${xmlTag('relativePath', parent.relativePath, 4)}  </parent>\n` : '';
+    const buildXml = pluginXml ? `\n  <build>\n    <plugins>\n${pluginXml}\n    </plugins>\n  </build>\n` : '';
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<project xmlns="http://maven.apache.org/POM/4.0.0"\n         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">\n  <modelVersion>4.0.0</modelVersion>\n${parentXml}\n  <groupId>${xmlEscape(groupId)}</groupId>\n  <artifactId>${xmlEscape(artifactId)}</artifactId>\n  <version>${xmlEscape(version)}</version>\n${packaging ? `  <packaging>${xmlEscape(packaging)}</packaging>\n` : ''}  <name>${xmlEscape(appName)}</name>\n  <description>${xmlEscape(description || 'Generated Maven application')}</description>\n${renderPropertiesBlock(properties)}\n  <dependencies>\n${dependencyXml}\n  </dependencies>\n${buildXml}</project>\n`;
+}
+
+function renderApplicationProperties(properties) {
+    if (typeof properties === 'string') return properties.endsWith('\n') ? properties : `${properties}\n`;
+    return `${Object.entries(properties || {}).map(([key, value]) => `${key}=${value}`).join('\n')}\n`;
+}
+
+function normalizeFields(fields) {
+    const source = Array.isArray(fields) && fields.length
+        ? fields
+        : [
+            { name: 'name', type: 'String', required: true },
+            { name: 'description', type: 'String' }
+        ];
+
+    const normalized = [];
+    for (const field of source) {
+        const name = toCamelCase(field.name);
+        const type = String(field.type || 'String').trim();
+        if (!isValidJavaIdentifier(name)) {
+            throw new Error(`Invalid field name '${field.name}'`);
+        }
+        if (!/^[A-Za-z_$][A-Za-z0-9_$.<>?, ]*$/.test(type)) {
+            throw new Error(`Invalid Java type '${field.type}' for field '${field.name}'`);
+        }
+        if (name === 'id') continue;
+        normalized.push({
+            name,
+            type,
+            required: Boolean(field.required),
+            unique: Boolean(field.unique)
+        });
+    }
+    return normalized;
+}
+
+function importsForTypes(fields) {
+    const imports = new Set();
+    for (const field of fields) {
+        if (field.type.includes('BigDecimal')) imports.add('java.math.BigDecimal');
+        if (field.type.includes('LocalDateTime')) imports.add('java.time.LocalDateTime');
+        if (field.type.includes('LocalDate')) imports.add('java.time.LocalDate');
+        if (field.type.includes('UUID')) imports.add('java.util.UUID');
+    }
+    return [...imports].sort();
+}
+
+function renderFieldAccessors(fields) {
+    return fields.map(field => {
+        const method = toPascalCase(field.name);
+        return `\n    public ${field.type} get${method}() {\n        return ${field.name};\n    }\n\n    public void set${method}(${field.type} ${field.name}) {\n        this.${field.name} = ${field.name};\n    }`;
+    }).join('\n');
+}
+
+function renderEntity(packageName, entityName, fields) {
+    const imports = [
+        'jakarta.persistence.Column',
+        'jakarta.persistence.Entity',
+        'jakarta.persistence.GeneratedValue',
+        'jakarta.persistence.GenerationType',
+        'jakarta.persistence.Id',
+        'jakarta.persistence.Table',
+        ...importsForTypes(fields)
+    ].map(i => `import ${i};`).join('\n');
+    const tableName = toKebabCase(entityName).replace(/-/g, '_');
+    const declarations = fields.map(field => {
+        const columnOptions = [];
+        if (field.required) columnOptions.push('nullable = false');
+        if (field.unique) columnOptions.push('unique = true');
+        const column = columnOptions.length ? `\n    @Column(${columnOptions.join(', ')})` : '';
+        return `${column}\n    private ${field.type} ${field.name};`;
+    }).join('\n\n');
+
+    return `package ${packageName}.entity;\n\n${imports}\n\n@Entity\n@Table(name = "${tableName}")\npublic class ${entityName} {\n\n    @Id\n    @GeneratedValue(strategy = GenerationType.IDENTITY)\n    private Long id;\n\n${declarations}\n\n    public Long getId() {\n        return id;\n    }\n\n    public void setId(Long id) {\n        this.id = id;\n    }\n${renderFieldAccessors(fields)}\n}\n`;
+}
+
+function renderRequestDto(packageName, entityName, fields) {
+    const validationImport = fields.some(f => f.required)
+        ? 'import jakarta.validation.constraints.NotBlank;\nimport jakarta.validation.constraints.NotNull;\n'
+        : '';
+    const typeImports = importsForTypes(fields).map(i => `import ${i};\n`).join('');
+    const declarations = fields.map(field => {
+        let annotation = '';
+        if (field.required) annotation = field.type === 'String' ? '    @NotBlank\n' : '    @NotNull\n';
+        return `${annotation}    private ${field.type} ${field.name};`;
+    }).join('\n\n');
+
+    return `package ${packageName}.dto;\n\n${validationImport}${typeImports}\npublic class ${entityName}Request {\n\n${declarations}\n${renderFieldAccessors(fields)}\n}\n`;
+}
+
+function renderResponseDto(packageName, entityName, fields) {
+    const typeImports = importsForTypes(fields).map(i => `import ${i};\n`).join('');
+    const declarations = fields.map(field => `    private ${field.type} ${field.name};`).join('\n\n');
+    return `package ${packageName}.dto;\n\n${typeImports}\npublic class ${entityName}Response {\n\n    private Long id;\n\n${declarations}\n\n    public Long getId() {\n        return id;\n    }\n\n    public void setId(Long id) {\n        this.id = id;\n    }\n${renderFieldAccessors(fields)}\n}\n`;
+}
+
+function renderRepository(packageName, entityName) {
+    return `package ${packageName}.repository;\n\nimport ${packageName}.entity.${entityName};\nimport org.springframework.data.jpa.repository.JpaRepository;\n\npublic interface ${entityName}Repository extends JpaRepository<${entityName}, Long> {\n}\n`;
+}
+
+function renderService(packageName, entityName, fields) {
+    const varName = toCamelCase(entityName);
+    const fieldAssignments = fields.map(field => `        ${varName}.set${toPascalCase(field.name)}(request.get${toPascalCase(field.name)}());`).join('\n');
+    const responseAssignments = fields.map(field => `        response.set${toPascalCase(field.name)}(${varName}.get${toPascalCase(field.name)}());`).join('\n');
+    return `package ${packageName}.service;\n\nimport ${packageName}.dto.${entityName}Request;\nimport ${packageName}.dto.${entityName}Response;\nimport ${packageName}.entity.${entityName};\nimport ${packageName}.repository.${entityName}Repository;\nimport java.util.List;\nimport org.springframework.http.HttpStatus;\nimport org.springframework.stereotype.Service;\nimport org.springframework.transaction.annotation.Transactional;\nimport org.springframework.web.server.ResponseStatusException;\n\n@Service\n@Transactional\npublic class ${entityName}Service {\n\n    private final ${entityName}Repository repository;\n\n    public ${entityName}Service(${entityName}Repository repository) {\n        this.repository = repository;\n    }\n\n    @Transactional(readOnly = true)\n    public List<${entityName}Response> findAll() {\n        return repository.findAll().stream().map(this::toResponse).toList();\n    }\n\n    @Transactional(readOnly = true)\n    public ${entityName}Response findById(Long id) {\n        return toResponse(findEntity(id));\n    }\n\n    public ${entityName}Response create(${entityName}Request request) {\n        ${entityName} ${varName} = new ${entityName}();\n${fieldAssignments}\n        return toResponse(repository.save(${varName}));\n    }\n\n    public ${entityName}Response update(Long id, ${entityName}Request request) {\n        ${entityName} ${varName} = findEntity(id);\n${fieldAssignments}\n        return toResponse(repository.save(${varName}));\n    }\n\n    public void delete(Long id) {\n        ${entityName} ${varName} = findEntity(id);\n        repository.delete(${varName});\n    }\n\n    private ${entityName} findEntity(Long id) {\n        return repository.findById(id)\n            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "${entityName} not found"));\n    }\n\n    private ${entityName}Response toResponse(${entityName} ${varName}) {\n        ${entityName}Response response = new ${entityName}Response();\n        response.setId(${varName}.getId());\n${responseAssignments}\n        return response;\n    }\n}\n`;
+}
+
+function renderController(packageName, entityName, resourcePath) {
+    return `package ${packageName}.controller;\n\nimport ${packageName}.dto.${entityName}Request;\nimport ${packageName}.dto.${entityName}Response;\nimport ${packageName}.service.${entityName}Service;\nimport jakarta.validation.Valid;\nimport java.net.URI;\nimport java.util.List;\nimport org.springframework.http.ResponseEntity;\nimport org.springframework.web.bind.annotation.DeleteMapping;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.PathVariable;\nimport org.springframework.web.bind.annotation.PostMapping;\nimport org.springframework.web.bind.annotation.PutMapping;\nimport org.springframework.web.bind.annotation.RequestBody;\nimport org.springframework.web.bind.annotation.RequestMapping;\nimport org.springframework.web.bind.annotation.RestController;\n\n@RestController\n@RequestMapping("/api/${resourcePath}")\npublic class ${entityName}Controller {\n\n    private final ${entityName}Service service;\n\n    public ${entityName}Controller(${entityName}Service service) {\n        this.service = service;\n    }\n\n    @GetMapping\n    public List<${entityName}Response> findAll() {\n        return service.findAll();\n    }\n\n    @GetMapping("/{id}")\n    public ${entityName}Response findById(@PathVariable Long id) {\n        return service.findById(id);\n    }\n\n    @PostMapping\n    public ResponseEntity<${entityName}Response> create(@Valid @RequestBody ${entityName}Request request) {\n        ${entityName}Response created = service.create(request);\n        return ResponseEntity.created(URI.create("/api/${resourcePath}/" + created.getId())).body(created);\n    }\n\n    @PutMapping("/{id}")\n    public ${entityName}Response update(@PathVariable Long id, @Valid @RequestBody ${entityName}Request request) {\n        return service.update(id, request);\n    }\n\n    @DeleteMapping("/{id}")\n    public ResponseEntity<Void> delete(@PathVariable Long id) {\n        service.delete(id);\n        return ResponseEntity.noContent().build();\n    }\n}\n`;
 }
 
 /* ================================================================
@@ -387,7 +820,7 @@ const server = http.createServer(async (req, res) => {
         const reqs = await checkRequirements();
         return send(res, 200, {
             status: 'UP',
-            version: '1.0',
+            version: '2.0',
             type: 'java-maven-spring-agent',
             baseDir: BASE_DIR,
             projectCount: projects.size,
@@ -499,6 +932,316 @@ const server = http.createServer(async (req, res) => {
             });
         } catch (e) {
             return err500(res, `Maven project creation failed: ${e.message}`);
+        }
+    }
+
+    /* ── POST /spring/create – Create a full Spring Boot Maven app ─
+       Body: {
+         groupId: "com.example",
+         artifactId: "inventory-api",
+         packageName?: "com.example.inventory",
+         appName?: "InventoryApi",
+         version?: "0.0.1-SNAPSHOT",
+         parent?: { groupId, artifactId, version, relativePath? },
+         properties?: { "java.version": "17" },
+         dependencies?: [{ groupId, artifactId, version?, scope? }],
+         plugins?: [{ groupId?, artifactId, version?, configuration?, executions? }],
+         applicationProperties?: { "server.port": "8080" } | "raw=file"
+       }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/spring/create' && req.method === 'POST') {
+        const reqs = await checkRequirements();
+        if (!reqs.ok) return send(res, 500, { error: reqs.error });
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const {
+            groupId,
+            artifactId,
+            version = '0.0.1-SNAPSHOT',
+            packaging,
+            parent,
+            properties = {},
+            dependencies,
+            plugins,
+            applicationProperties = {}
+        } = body;
+
+        if (!groupId || !artifactId) return err400(res, 'Provide { groupId, artifactId } in body');
+        if (!/^[A-Za-z0-9_.-]+$/.test(artifactId)) return err400(res, 'artifactId may contain only letters, numbers, dot, underscore, and hyphen');
+        if (projects.has(artifactId)) {
+            return send(res, 409, { error: `Project '${artifactId}' already exists`, path: projects.get(artifactId).path });
+        }
+
+        const projectPath = path.join(BASE_DIR, artifactId);
+        if (fs.existsSync(projectPath)) {
+            return send(res, 409, { error: `Directory '${artifactId}' already exists on disk`, path: projectPath });
+        }
+
+        const packageName = sanitizePackageName(body.packageName || `${groupId}.${artifactId}`);
+        const appName = toPascalCase(body.appName || artifactId) || 'Application';
+        const applicationClass = appName.endsWith('Application') ? appName : `${appName}Application`;
+        const normalizedDependencies = normalizeDependencies(dependencies);
+        const normalizedPlugins = normalizePlugins(plugins);
+
+        try {
+            fs.mkdirSync(projectPath, { recursive: true });
+
+            const files = [];
+            files.push(writeTextFile(
+                path.join(projectPath, 'pom.xml'),
+                renderSpringPom({
+                    groupId,
+                    artifactId,
+                    version,
+                    packaging,
+                    appName,
+                    description: body.description,
+                    parent,
+                    properties,
+                    dependencies: normalizedDependencies,
+                    plugins: normalizedPlugins
+                })
+            ));
+
+            files.push(writeTextFile(
+                path.join(javaPackageDir(projectPath, packageName), `${applicationClass}.java`),
+                `package ${packageName};\n\nimport org.springframework.boot.SpringApplication;\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\n\n@SpringBootApplication\npublic class ${applicationClass} {\n\n    public static void main(String[] args) {\n        SpringApplication.run(${applicationClass}.class, args);\n    }\n}\n`
+            ));
+
+            files.push(writeTextFile(
+                path.join(javaPackageDir(projectPath, packageName, 'controller'), 'HealthController.java'),
+                `package ${packageName}.controller;\n\nimport java.util.Map;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.RestController;\n\n@RestController\npublic class HealthController {\n\n    @GetMapping("/api/health")\n    public Map<String, String> health() {\n        return Map.of("status", "UP");\n    }\n}\n`
+            ));
+
+            files.push(writeTextFile(
+                path.join(projectPath, 'src', 'main', 'resources', 'application.properties'),
+                renderApplicationProperties(applicationProperties)
+            ));
+
+            files.push(writeTextFile(
+                path.join(javaTestPackageDir(projectPath, packageName), `${applicationClass}Tests.java`),
+                `package ${packageName};\n\nimport org.junit.jupiter.api.Test;\nimport org.springframework.boot.test.context.SpringBootTest;\n\n@SpringBootTest\nclass ${applicationClass}Tests {\n\n    @Test\n    void contextLoads() {\n    }\n}\n`
+            ));
+
+            files.push(writeTextFile(
+                path.join(projectPath, '.gitignore'),
+                `target/\n.mvn/wrapper/maven-wrapper.jar\n*.log\n.idea/\n*.iml\n.vscode/\n.DS_Store\n`
+            ));
+
+            files.push(writeTextFile(
+                path.join(projectPath, 'README.md'),
+                `# ${appName}\n\nGenerated Spring Boot Maven application.\n\n## Run\n\n\`\`\`bash\nmvn spring-boot:run\n\`\`\`\n\n## Build\n\n\`\`\`bash\nmvn package\n\`\`\`\n\nHealth endpoint: \`GET /api/health\`\n`
+            ));
+
+            projects.set(artifactId, {
+                name: artifactId,
+                path: projectPath,
+                groupId,
+                artifactId,
+                packageName,
+                type: 'spring-boot',
+                createdAt: new Date().toISOString()
+            });
+            saveProjects();
+
+            return send(res, 200, {
+                message: `Spring Boot project '${artifactId}' created successfully`,
+                project: projects.get(artifactId),
+                applicationClass: `${packageName}.${applicationClass}`,
+                dependencies: normalizedDependencies,
+                plugins: normalizedPlugins,
+                files
+            });
+        } catch (e) {
+            return err500(res, `Spring Boot project creation failed: ${e.message}`);
+        }
+    }
+
+    /* ── POST /spring/crud – Generate a CRUD resource ───────────
+       Query: ?projectName=inventory-api
+       Body: {
+         resourceName: "Product",
+         packageName?: "com.example.inventory",
+         path?: "products",
+         fields?: [
+           { name: "name", type: "String", required: true },
+           { name: "price", type: "BigDecimal", required: true }
+         ]
+       }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/spring/crud' && req.method === 'POST') {
+        const reqs = await checkRequirements();
+        if (!reqs.ok) return send(res, 500, { error: reqs.error });
+
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const entityName = toPascalCase(body.resourceName);
+        if (!entityName || !isValidJavaIdentifier(entityName)) {
+            return err400(res, 'Provide a valid { resourceName } such as "Product"');
+        }
+
+        const project = projects.get(projectName);
+        const packageName = sanitizePackageName(body.packageName || project.packageName || project.groupId || 'com.example.demo');
+        const resourcePath = body.path ? toKebabCase(body.path) : pluralizeKebab(entityName);
+        if (!resourcePath) return err400(res, 'Could not determine REST path for resource');
+
+        let fields;
+        try { fields = normalizeFields(body.fields); } catch (e) { return err400(res, e.message); }
+
+        const files = [
+            {
+                file: path.join(javaPackageDir(project.path, packageName, 'entity'), `${entityName}.java`),
+                content: renderEntity(packageName, entityName, fields)
+            },
+            {
+                file: path.join(javaPackageDir(project.path, packageName, 'dto'), `${entityName}Request.java`),
+                content: renderRequestDto(packageName, entityName, fields)
+            },
+            {
+                file: path.join(javaPackageDir(project.path, packageName, 'dto'), `${entityName}Response.java`),
+                content: renderResponseDto(packageName, entityName, fields)
+            },
+            {
+                file: path.join(javaPackageDir(project.path, packageName, 'repository'), `${entityName}Repository.java`),
+                content: renderRepository(packageName, entityName)
+            },
+            {
+                file: path.join(javaPackageDir(project.path, packageName, 'service'), `${entityName}Service.java`),
+                content: renderService(packageName, entityName, fields)
+            },
+            {
+                file: path.join(javaPackageDir(project.path, packageName, 'controller'), `${entityName}Controller.java`),
+                content: renderController(packageName, entityName, resourcePath)
+            }
+        ];
+
+        try {
+            const written = files.map(({ file, content }) => {
+                const overwritten = fs.existsSync(file);
+                writeTextFile(file, content);
+                return { file, overwritten };
+            });
+
+            return send(res, 200, {
+                message: `CRUD resource '${entityName}' generated successfully`,
+                projectName,
+                packageName,
+                resourceName: entityName,
+                endpoints: [
+                    `GET    /api/${resourcePath}`,
+                    `GET    /api/${resourcePath}/{id}`,
+                    `POST   /api/${resourcePath}`,
+                    `PUT    /api/${resourcePath}/{id}`,
+                    `DELETE /api/${resourcePath}/{id}`
+                ],
+                fields,
+                files: written
+            });
+        } catch (e) {
+            return err500(res, `CRUD resource generation failed: ${e.message}`);
+        }
+    }
+
+    /* ── GET /maven/pom – Read pom.xml summary ────────────────
+       Query: ?projectName=my-app&raw=true
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/pom' && req.method === 'GET') {
+        const { projectName, raw } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        const project = projects.get(projectName);
+        const pomPath = path.join(project.path, 'pom.xml');
+        if (!fs.existsSync(pomPath)) return err404(res, `pom.xml not found in project '${projectName}'`);
+
+        try {
+            return send(res, 200, {
+                projectName,
+                pomPath,
+                summary: parsePomSummary(pomPath),
+                rawXml: raw === 'true' || raw === '1' ? fs.readFileSync(pomPath, 'utf8') : undefined
+            });
+        } catch (e) {
+            return err500(res, `Failed to read pom.xml: ${e.message}`);
+        }
+    }
+
+    /* ── PUT /maven/properties – Add/update pom properties ─────
+       Query: ?projectName=my-app
+       Body: { properties: { "java.version": "17" } }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/properties' && req.method === 'PUT') {
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+        const properties = body.properties || body;
+        if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+            return err400(res, 'Provide { properties: { key: value } } in body');
+        }
+
+        const project = projects.get(projectName);
+        const pomPath = path.join(project.path, 'pom.xml');
+        if (!fs.existsSync(pomPath)) return err404(res, `pom.xml not found in project '${projectName}'`);
+
+        try {
+            upsertPropertiesInPom(pomPath, properties);
+            return send(res, 200, {
+                message: 'POM properties updated',
+                projectName,
+                properties: parsePomSummary(pomPath).properties
+            });
+        } catch (e) {
+            return err500(res, `Failed to update POM properties: ${e.message}`);
+        }
+    }
+
+    /* ── PUT /maven/parent – Add/update pom parent ─────────────
+       Query: ?projectName=my-app
+       Body: { groupId, artifactId, version, relativePath? }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/parent' && req.method === 'PUT') {
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+        if (!body.groupId || !body.artifactId || !body.version) {
+            return err400(res, 'Provide { groupId, artifactId, version, relativePath? } in body');
+        }
+
+        const project = projects.get(projectName);
+        const pomPath = path.join(project.path, 'pom.xml');
+        if (!fs.existsSync(pomPath)) return err404(res, `pom.xml not found in project '${projectName}'`);
+
+        try {
+            const result = upsertParentInPom(pomPath, body);
+            if (result.error) return err500(res, result.error);
+            return send(res, 200, {
+                message: 'POM parent updated',
+                projectName,
+                parent: parsePomSummary(pomPath).parent
+            });
+        } catch (e) {
+            return err500(res, `Failed to update POM parent: ${e.message}`);
         }
     }
 
@@ -616,7 +1359,11 @@ const server = http.createServer(async (req, res) => {
          groupId: "org.springframework.boot",
          artifactId: "spring-boot-starter-web",
          version?: "3.2.0",
-         scope?: "compile"
+         type?: "jar",
+         classifier?: "...",
+         scope?: "compile",
+         optional?: false,
+         exclusions?: [{ groupId, artifactId }]
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/dependency' && req.method === 'POST') {
@@ -634,7 +1381,7 @@ const server = http.createServer(async (req, res) => {
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
-        const { groupId, artifactId, version, scope } = body;
+        const { groupId, artifactId, version, type, classifier, scope, optional, exclusions, rawXml } = body;
         if (!groupId || !artifactId) {
             return err400(res, 'Provide { groupId, artifactId } in body');
         }
@@ -647,7 +1394,20 @@ const server = http.createServer(async (req, res) => {
         }
 
         try {
-            const result = addDependencyToPom(pomPath, groupId.trim(), artifactId.trim(), version ? version.trim() : null, scope ? scope.trim() : null);
+            const result = addDependencyToPom(
+                pomPath,
+                groupId.trim(),
+                artifactId.trim(),
+                version ? String(version).trim() : null,
+                scope ? String(scope).trim() : null,
+                {
+                    type: type ? String(type).trim() : null,
+                    classifier: classifier ? String(classifier).trim() : null,
+                    optional,
+                    exclusions,
+                    rawXml
+                }
+            );
             if (result.error) {
                 return err500(res, result.error);
             }
@@ -659,6 +1419,99 @@ const server = http.createServer(async (req, res) => {
             });
         } catch (e) {
             return err500(res, `Failed to add dependency: ${e.message}`);
+        }
+    }
+
+    /* ── POST /maven/dependencies – Add/update many dependencies ─
+       Query: ?projectName=my-app
+       Body: { dependencies: [{ groupId, artifactId, version?, scope?, exclusions? }] }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/dependencies' && req.method === 'POST') {
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+        const dependencies = normalizeDependencies(body.dependencies);
+        if (!dependencies.length) return err400(res, 'Provide { dependencies: [{ groupId, artifactId, ... }] } in body');
+
+        const project = projects.get(projectName);
+        const pomPath = path.join(project.path, 'pom.xml');
+        if (!fs.existsSync(pomPath)) return err404(res, `pom.xml not found in project '${projectName}'`);
+
+        try {
+            const results = dependencies.map(dep => addDependencyToPom(
+                pomPath,
+                dep.groupId,
+                dep.artifactId,
+                dep.version || null,
+                dep.scope || null,
+                dep
+            ));
+            return send(res, 200, {
+                message: 'Dependencies processed',
+                projectName,
+                results,
+                dependencies: parseDependencies(pomPath)
+            });
+        } catch (e) {
+            return err500(res, `Failed to add dependencies: ${e.message}`);
+        }
+    }
+
+    /* ── GET /maven/plugins – List build plugins ───────────────
+       Query: ?projectName=my-app
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/plugins' && req.method === 'GET') {
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+        const project = projects.get(projectName);
+        const pomPath = path.join(project.path, 'pom.xml');
+        if (!fs.existsSync(pomPath)) return err404(res, `pom.xml not found in project '${projectName}'`);
+        try {
+            const plugins = parsePlugins(pomPath);
+            return send(res, 200, { projectName, count: plugins.length, plugins });
+        } catch (e) {
+            return err500(res, `Failed to read plugins: ${e.message}`);
+        }
+    }
+
+    /* ── POST /maven/plugin – Add/update build plugin ──────────
+       Query: ?projectName=my-app
+       Body: { groupId?, artifactId, version?, configuration?, executions?, rawXml? }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/plugin' && req.method === 'POST') {
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+        if (!body.rawXml && !body.artifactId) return err400(res, 'Provide { artifactId } or { rawXml } in body');
+
+        const project = projects.get(projectName);
+        const pomPath = path.join(project.path, 'pom.xml');
+        if (!fs.existsSync(pomPath)) return err404(res, `pom.xml not found in project '${projectName}'`);
+
+        try {
+            const result = upsertPluginInPom(pomPath, body);
+            if (result.error) return err400(res, result.error);
+            return send(res, 200, {
+                message: `Plugin ${result.action}`,
+                projectName,
+                ...result,
+                plugins: parsePlugins(pomPath)
+            });
+        } catch (e) {
+            return err500(res, `Failed to add plugin: ${e.message}`);
         }
     }
 
@@ -822,10 +1675,18 @@ const server = http.createServer(async (req, res) => {
             'GET  /health',
             'GET  /maven/projects',
             'POST /maven/create                   { groupId, artifactId, version?, archetypeGroupId?, archetypeArtifactId?, archetypeVersion?, javaVersion? }',
+            'POST /spring/create                  { groupId, artifactId, packageName?, parent?, properties?, dependencies?, plugins?, applicationProperties? }',
+            'POST /spring/crud?projectName=       { resourceName, packageName?, path?, fields? }',
+            'GET  /maven/pom?projectName=&raw=true',
+            'PUT  /maven/properties?projectName=  { properties: { key: value } }',
+            'PUT  /maven/parent?projectName=      { groupId, artifactId, version, relativePath? }',
             'POST /maven/class?projectName=&packageName=&className=    { code: "..." }',
             'PUT  /maven/class?projectName=&packageName=&className=    { code: "..." }',
             'POST /maven/dependency?projectName=   { groupId, artifactId, version?, scope? }',
+            'POST /maven/dependencies?projectName= { dependencies: [...] }',
             'GET  /maven/dependencies?projectName=',
+            'GET  /maven/plugins?projectName=',
+            'POST /maven/plugin?projectName=       { groupId?, artifactId, version?, configuration?, executions? }',
             'GET  /maven/build?projectName=&skipTests=true',
             'GET  /maven/jar?projectName=',
             'GET  /maven/rescan'
@@ -839,10 +1700,18 @@ server.listen(PORT, () => {
     console.log('  GET  /health                         - Server status & requirement check');
     console.log('  GET  /maven/projects                 - List all tracked projects');
     console.log('  POST /maven/create                   - Create a new Maven project');
+    console.log('  POST /spring/create                  - Create a configurable Spring Boot Maven application');
+    console.log('  POST /spring/crud?projectName=       - Generate entity/repository/service/controller CRUD');
+    console.log('  GET  /maven/pom?projectName=         - Read POM summary/raw XML');
+    console.log('  PUT  /maven/properties?projectName=  - Add/update POM properties');
+    console.log('  PUT  /maven/parent?projectName=      - Add/update POM parent');
     console.log('  POST /maven/class?projectName=&...   - Create a Java class');
     console.log('  PUT  /maven/class?projectName=&...   - Update a Java class');
     console.log('  POST /maven/dependency?projectName=  - Add/update dependency in pom.xml');
+    console.log('  POST /maven/dependencies?projectName=- Add/update multiple dependencies');
     console.log('  GET  /maven/dependencies?projectName=- List project dependencies');
+    console.log('  GET  /maven/plugins?projectName=     - List build plugins');
+    console.log('  POST /maven/plugin?projectName=      - Add/update build plugin');
     console.log('  GET  /maven/build?projectName=       - Build project (mvn package)');
     console.log('  GET  /maven/jar?projectName=         - Download built JAR');
     console.log('  GET  /maven/rescan                   - Rescan for existing Maven projects');
