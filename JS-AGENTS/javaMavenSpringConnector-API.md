@@ -177,6 +177,23 @@ Plugin objects support `groupId`, `artifactId`, `version`, `extensions`, `config
 }
 ```
 
+**Response 200** (with warnings):
+```json
+{
+  "message": "Spring Boot project 'inventory-api' created successfully",
+  "project": { ... },
+  "applicationClass": "com.example.inventory.InventoryApiApplication",
+  "dependencies": [ ... ],
+  "plugins": [ ... ],
+  "files": [ ... ],
+  "validationWarnings": [
+    "WARNING: Spring Boot dependencies detected without parent/BOM. Consider adding spring-boot-starter-parent as parent or using spring-boot-dependencies BOM."
+  ]
+}
+```
+
+**Validation:** If Spring Boot dependencies are detected without a parent/BOM or with unversioned dependencies, `validationWarnings` array is populated. This helps catch configuration issues that may cause Maven build failures.
+
 **Response 409:** Project or directory already exists.
 
 ---
@@ -477,7 +494,7 @@ For complex plugin XML, pass `configurationXml`, `executionsXml`, or `rawXml`.
 
 ### `GET /maven/build?projectName=&skipTests=true`
 
-Build the project with `mvn package`.
+Build the project with `mvn package`. Extracts and returns meaningful error messages on build failure.
 
 **Query:**
 | Param | Required | Default |
@@ -485,7 +502,130 @@ Build the project with `mvn package`.
 | `projectName` | ✅ | – |
 | `skipTests` | | `false` |
 
-**Response 200:** Build result, path to generated JAR, last 1000 chars of maven output.
+**Response 200:**
+```json
+{
+  "message": "Build successful",
+  "projectName": "my-app",
+  "buildSuccess": true,
+  "jarFile": "/base/my-app/target/my-app-1.0-SNAPSHOT.jar",
+  "errorSummary": null,
+  "mavenOutput": "...[last 1000 chars]..."
+}
+```
+
+**Response 500 (on failure):** Includes `errorSummary` array with first 10 error lines extracted from Maven output:
+```json
+{
+  "message": "Build failed",
+  "projectName": "my-app",
+  "buildSuccess": false,
+  "jarFile": null,
+  "errorSummary": [
+    "[ERROR] COMPILATION ERROR",
+    "[ERROR] /path/to/file.java:[line] error message"
+  ],
+  "mavenOutput": "...[last 1000 chars]..."
+}
+```
+
+**Error Extraction:** Filters Maven output for lines containing `[ERROR]`, `FAILURE`, or `error` keywords to surface actual compilation/build errors instead of warnings.
+
+---
+
+### `GET /maven/artifact?projectName=`
+
+Retrieve JAR artifact metadata (path, size, coordinates) without downloading the binary.
+
+**Query:** `?projectName=my-app`
+
+**Sample Response 200:**
+```json
+{
+  "message": "JAR artifact information",
+  "projectName": "my-app",
+  "artifactName": "my-app-1.0-SNAPSHOT.jar",
+  "jarPath": "/home/user/projects/my-app/target/my-app-1.0-SNAPSHOT.jar",
+  "jarRelativePath": "target/my-app-1.0-SNAPSHOT.jar",
+  "jarAbsolutePath": "/home/user/projects/my-app/target/my-app-1.0-SNAPSHOT.jar",
+  "jarSize": 52428800,
+  "jarSizeKB": 51200,
+  "groupId": "com.example",
+  "artifactId": "my-app",
+  "packageName": "com.example.myapp"
+}
+```
+
+**Response 404:** No JAR found – build the project first with `/maven/build`.
+
+**Path Fields:** `jarPath` returns the **absolute system path** (full path to JAR). Use this for CI/CD pipelines and file operations. `jarRelativePath` is the relative path from the project directory for reference.
+
+
+---
+
+### `GET /maven/project-details?projectName=`
+
+Retrieve complete project information including POM details, source directories, and build artifacts. All path fields return **absolute system paths** for CI/CD integration.
+
+**Query:** `?projectName=my-app`
+
+**Response 200:**
+```json
+{
+  "message": "Complete project details",
+  "projectName": "my-app",
+  "projectInfo": {
+    "name": "my-app",
+    "path": "/home/user/projects/my-app",
+    "relativePath": "my-app",
+    "absolutePath": "/home/user/projects/my-app",
+    "groupId": "com.example",
+    "artifactId": "my-app",
+    "packageName": "com.example.myapp",
+    "type": "spring-boot",
+    "createdAt": "2026-05-01T12:00:00.000Z"
+  },
+  "pomInfo": {
+    "path": "/home/user/projects/my-app/pom.xml",
+    "relativePath": "pom.xml",
+    "exists": true,
+    "summary": {
+      "groupId": "com.example",
+      "artifactId": "my-app",
+      "version": "1.0-SNAPSHOT",
+      "parent": { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-parent", "version": "3.3.5" },
+      "properties": { "java.version": "17" },
+      "dependencies": [ ... ],
+      "plugins": [ ... ]
+    }
+  },
+  "sourceDirs": {
+    "mainJava": "/home/user/projects/my-app/src/main/java",
+    "mainJavaRelative": "src/main/java",
+    "testJava": "/home/user/projects/my-app/src/test/java",
+    "testJavaRelative": "src/test/java",
+    "mainJavaExists": true,
+    "testJavaExists": true
+  },
+  "buildArtifact": {
+    "name": "my-app-1.0-SNAPSHOT.jar",
+    "path": "/home/user/projects/my-app/target/my-app-1.0-SNAPSHOT.jar",
+    "relativePath": "target/my-app-1.0-SNAPSHOT.jar",
+    "absolutePath": "/home/user/projects/my-app/target/my-app-1.0-SNAPSHOT.jar",
+    "size": 52428800,
+    "sizeKB": 51200
+  },
+  "targetDir": {
+    "path": "/home/user/projects/my-app/target",
+    "relativePath": "target",
+    "exists": true
+  }
+}
+```
+
+**Path Fields:** All `.path` fields return the **absolute system path** (recommended for scripts and automation). `.relativePath` fields provide relative paths from the project root for reference.
+
+Built as the `getProjectDetails` API to return all relevant project information in one call.
 
 ---
 

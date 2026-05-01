@@ -820,7 +820,7 @@ const server = http.createServer(async (req, res) => {
         const reqs = await checkRequirements();
         return send(res, 200, {
             status: 'UP',
-            version: '2.0',
+            version: '3.0',
             type: 'java-maven-spring-agent',
             baseDir: BASE_DIR,
             projectCount: projects.size,
@@ -979,10 +979,32 @@ const server = http.createServer(async (req, res) => {
             return send(res, 409, { error: `Directory '${artifactId}' already exists on disk`, path: projectPath });
         }
 
+        // Validate Spring Boot configuration
+        const normalizedDependencies = normalizeDependencies(dependencies);
+        const hasParent = !!parent;
+        const hasSpringBootDeps = normalizedDependencies.some(dep => 
+            (dep.groupId === 'org.springframework.boot' || dep.groupId.includes('springframework.boot')) &&
+            !dep.artifactId.includes('starter-test')
+        );
+
+        // Warn if Spring Boot dependencies exist without parent/version management
+        let validationWarnings = [];
+        if (hasSpringBootDeps) {
+            if (!hasParent) {
+                validationWarnings.push('WARNING: Spring Boot dependencies detected without parent/BOM. Consider adding spring-boot-starter-parent as parent or using spring-boot-dependencies BOM.');
+            }
+            const depsWithoutVersions = normalizedDependencies.filter(dep => 
+                (dep.groupId === 'org.springframework.boot' || dep.groupId.includes('springframework.boot')) &&
+                !dep.version
+            );
+            if (depsWithoutVersions.length > 0) {
+                validationWarnings.push(`WARNING: ${depsWithoutVersions.length} Spring Boot dependencies have no explicit versions. Parent/BOM should manage them.`);
+            }
+        }
+
         const packageName = sanitizePackageName(body.packageName || `${groupId}.${artifactId}`);
         const appName = toPascalCase(body.appName || artifactId) || 'Application';
         const applicationClass = appName.endsWith('Application') ? appName : `${appName}Application`;
-        const normalizedDependencies = normalizeDependencies(dependencies);
         const normalizedPlugins = normalizePlugins(plugins);
 
         try {
@@ -1052,7 +1074,8 @@ const server = http.createServer(async (req, res) => {
                 applicationClass: `${packageName}.${applicationClass}`,
                 dependencies: normalizedDependencies,
                 plugins: normalizedPlugins,
-                files
+                files,
+                validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined
             });
         } catch (e) {
             return err500(res, `Spring Boot project creation failed: ${e.message}`);
@@ -1610,12 +1633,21 @@ const server = http.createServer(async (req, res) => {
                 jarFile = files.find(f => f.endsWith('.jar') && !f.endsWith('-sources.jar') && !f.endsWith('-javadoc.jar'));
             }
 
+            // Extract meaningful error lines if build failed
+            let errorLines = [];
+            if (!buildSuccess) {
+                errorLines = output.split('\n')
+                    .filter(line => line.includes('[ERROR]') || line.includes('FAILURE') || line.includes('error'))
+                    .slice(0, 10);
+            }
+
             return send(res, buildSuccess ? 200 : 500, {
                 message: buildSuccess ? 'Build successful' : 'Build failed',
                 projectName,
                 buildSuccess,
                 jarFile: jarFile ? path.join(targetDir, jarFile) : null,
-                mavenOutput: output.substring(output.length - 1000) // last 1000 chars
+                errorSummary: errorLines.length > 0 ? errorLines : null,
+                mavenOutput: output.substring(Math.max(0, output.length - 1000)) // last 1000 chars
             });
         } catch (e) {
             return err500(res, `Build failed: ${e.message}`);
@@ -1668,6 +1700,144 @@ const server = http.createServer(async (req, res) => {
         });
     }
 
+    /* ── GET /maven/artifact – Get JAR file path and info ────
+       Query: ?projectName=my-app
+       Returns path to JAR and metadata instead of downloading binary.
+       This is useful for "share jar location" use cases.
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/artifact' && req.method === 'GET') {
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        const project = projects.get(projectName);
+        const targetDir = path.join(project.path, 'target');
+
+        if (!fs.existsSync(targetDir)) {
+            return err404(res, `No target/ directory found. Build the project first using GET /maven/build?projectName=${projectName}`);
+        }
+
+        // Find the JAR file in target/
+        const files = fs.readdirSync(targetDir);
+        const jarFileName = files.find(f => f.endsWith('.jar') && !f.endsWith('-sources.jar') && !f.endsWith('-javadoc.jar'));
+
+        if (!jarFileName) {
+            return err404(res, `No JAR file found in target/. Build the project first using GET /maven/build?projectName=${projectName}`);
+        }
+
+        const jarFilePath = path.join(targetDir, jarFileName);
+        const jarAbsolutePath = path.resolve(jarFilePath);
+        const stat = fs.statSync(jarFilePath);
+
+        return send(res, 200, {
+            message: 'JAR artifact information',
+            projectName,
+            artifactName: jarFileName,
+            jarPath: jarAbsolutePath,
+            jarRelativePath: jarFilePath,
+            jarAbsolutePath: jarAbsolutePath,
+            jarSize: stat.size,
+            jarSizeKB: Math.round(stat.size / 1024),
+            groupId: project.groupId,
+            artifactId: project.artifactId,
+            packageName: project.packageName
+        });
+    }
+
+    /* ── GET /maven/project-details – Get complete project info ──
+       Query: ?projectName=my-app
+       Returns all details: jar file path, src file paths, pom info, etc.
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/project-details' && req.method === 'GET') {
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        const project = projects.get(projectName);
+        const pomPath = path.join(project.path, 'pom.xml');
+        const srcMainJavaPath = path.join(project.path, 'src', 'main', 'java');
+        const srcTestJavaPath = path.join(project.path, 'src', 'test', 'java');
+        const targetDir = path.join(project.path, 'target');
+
+        // Find JAR if exists
+        let jarInfo = null;
+        if (fs.existsSync(targetDir)) {
+            const files = fs.readdirSync(targetDir);
+            const jarFileName = files.find(f => f.endsWith('.jar') && !f.endsWith('-sources.jar') && !f.endsWith('-javadoc.jar'));
+            if (jarFileName) {
+                const jarFilePath = path.join(targetDir, jarFileName);
+                const jarAbsPath = path.resolve(jarFilePath);
+                const stat = fs.statSync(jarFilePath);
+                jarInfo = {
+                    name: jarFileName,
+                    path: jarAbsPath,
+                    relativePath: jarFilePath,
+                    absolutePath: jarAbsPath,
+                    size: stat.size,
+                    sizeKB: Math.round(stat.size / 1024)
+                };
+            }
+        }
+
+        // Parse POM for additional info
+        let pomInfo = {};
+        if (fs.existsSync(pomPath)) {
+            try {
+                pomInfo = parsePomSummary(pomPath);
+            } catch (e) {
+                pomInfo = { error: e.message };
+            }
+        }
+
+        const projectAbsolutePath = path.resolve(project.path);
+        const pomAbsolutePath = path.resolve(pomPath);
+        const srcMainJavaAbsPath = path.resolve(srcMainJavaPath);
+        const srcTestJavaAbsPath = path.resolve(srcTestJavaPath);
+        const targetDirAbsPath = path.resolve(targetDir);
+
+        return send(res, 200, {
+            message: 'Complete project details',
+            projectName,
+            projectInfo: {
+                name: project.name,
+                path: projectAbsolutePath,
+                relativePath: project.path,
+                absolutePath: projectAbsolutePath,
+                groupId: project.groupId,
+                artifactId: project.artifactId,
+                packageName: project.packageName,
+                type: project.type || 'maven',
+                createdAt: project.createdAt
+            },
+            pomInfo: {
+                path: pomAbsolutePath,
+                relativePath: pomPath,
+                exists: fs.existsSync(pomPath),
+                summary: pomInfo
+            },
+            sourceDirs: {
+                mainJava: srcMainJavaAbsPath,
+                mainJavaRelative: srcMainJavaPath,
+                testJava: srcTestJavaAbsPath,
+                testJavaRelative: srcTestJavaPath,
+                mainJavaExists: fs.existsSync(srcMainJavaPath),
+                testJavaExists: fs.existsSync(srcTestJavaPath)
+            },
+            buildArtifact: jarInfo,
+            targetDir: {
+                path: targetDirAbsPath,
+                relativePath: targetDir,
+                exists: fs.existsSync(targetDir)
+            }
+        });
+    }
+
     /* ── 404 ──────────────────────────────────────────────────── */
     send(res, 404, {
         error: 'Endpoint not found',
@@ -1689,6 +1859,8 @@ const server = http.createServer(async (req, res) => {
             'POST /maven/plugin?projectName=       { groupId?, artifactId, version?, configuration?, executions? }',
             'GET  /maven/build?projectName=&skipTests=true',
             'GET  /maven/jar?projectName=',
+            'GET  /maven/artifact?projectName=     -- Returns JAR path info (not binary download)',
+            'GET  /maven/project-details?projectName= -- Returns complete project and JAR details',
             'GET  /maven/rescan'
         ]
     });
@@ -1714,5 +1886,7 @@ server.listen(PORT, () => {
     console.log('  POST /maven/plugin?projectName=      - Add/update build plugin');
     console.log('  GET  /maven/build?projectName=       - Build project (mvn package)');
     console.log('  GET  /maven/jar?projectName=         - Download built JAR');
+    console.log('  GET  /maven/artifact?projectName=    - Get JAR file path info (not binary)');
+    console.log('  GET  /maven/project-details?projectName= - Get complete project details (getProjectDetails alias)');
     console.log('  GET  /maven/rescan                   - Rescan for existing Maven projects');
 });
