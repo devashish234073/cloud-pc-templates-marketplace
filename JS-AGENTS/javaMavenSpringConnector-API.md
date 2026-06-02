@@ -20,7 +20,7 @@ Every mutating endpoint first verifies:
 1. **Java ≥ 11** – checks `java -version`; rejects if missing or < 11
 2. **Maven** – checks `mvn --version`; rejects if missing
 
-If either check fails, the endpoint returns `500` with an error message—no work is performed.
+If either check fails, the endpoint returns `500` with an error message-no work is performed.
 
 ---
 
@@ -351,7 +351,7 @@ Create (or overwrite) a Java class.
 
 ### `PUT /maven/class?projectName=&packageName=&className=`
 
-Update (overwrite) a Java class. **Identical behaviour** to `POST /maven/class` — exists for semantic REST clarity.
+Update (overwrite) a Java class. **Identical behaviour** to `POST /maven/class` - exists for semantic REST clarity.
 
 ---
 

@@ -1,5 +1,5 @@
 /**
- * GloVe Word Vector Arithmetic — Express API
+ * GloVe Word Vector Arithmetic - Express API
  *
  * Startup: loads the full GloVe model into memory once.
  * Then serves fast, synchronous requests.
@@ -256,9 +256,9 @@ async function handleRequest(req, res) {
   return send(res, 404, {
     error: "Not found.",
     routes: [
-      "GET  /health              — model load status",
-      "GET  /vocab?word=<term>   — check if a word is in vocab",
-      "POST /evaluate            — word vector arithmetic",
+      "GET  /health              - model load status",
+      "GET  /vocab?word=<term>   - check if a word is in vocab",
+      "POST /evaluate            - word vector arithmetic",
     ],
   });
 }
@@ -281,7 +281,7 @@ async function boot() {
     await ensureGlove();
     MODEL = await loadFullGlove(CACHE_PATH);
     MODEL_STATUS = "ready";
-    console.log(`[server] ✓ Model ready — ${MODEL.size.toLocaleString()} words in vocabulary.`);
+    console.log(`[server] ✓ Model ready - ${MODEL.size.toLocaleString()} words in vocabulary.`);
   } catch (err) {
     MODEL_STATUS = "error";
     console.error("[server] Failed to load GloVe model:", err);

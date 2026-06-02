@@ -79,5 +79,5 @@ On failure always returns HTTP 200 with an error object like:
   "errorCode": "1064",
   "sqlState": "42000",
   "errorMessage": "ERROR 1064 (42000): You have an error in your SQL syntax...",
-  "hint": "SQL syntax error — check your query for typos or missing keywords."
+  "hint": "SQL syntax error - check your query for typos or missing keywords."
 }
