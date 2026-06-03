@@ -36,7 +36,7 @@
         "port": 3038,
         "risky": true,
         "risk": "This agent can write arbitrary java code based on your ask, so use it at your own risk as if the llm can send risky code, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended code.",
-        "description": "Use this when you need to create Java Maven projects, generate Spring Boot applications, manage project dependencies, compile and execute Java code, or work with Spring framework applications. Essential for Java backend development tasks.",
+        "description": "Use this when you need to create Java Maven projects, generate Spring Boot applications, manage project dependencies, compile and execute Java code, or work with Spring framework applications. Also supports creating, reading, and modifying configuration files in src/main/resources. Essential for Java backend development tasks.",
         "stepsToInstall": "To start: download the js then start it with node <filename>.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/javaMavenSpringConnector.js",
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/javaMavenSpringConnector-API.md",

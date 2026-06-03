@@ -1838,6 +1838,211 @@ const server = http.createServer(async (req, res) => {
         });
     }
 
+    /* ── POST /maven/resource/file – Create/Add file in src/main/resources ──
+       Query: ?projectName=my-app&filePath=application.yml
+       Body: { content: "..." }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/resource/file' && req.method === 'POST') {
+        const { projectName, filePath: queryFilePath } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!queryFilePath) return err400(res, 'Provide ?filePath=<relative/path/to/file>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const { content } = body;
+        if (content === undefined || content === null) {
+            return err400(res, 'Provide { content: "..." } in body');
+        }
+
+        const project = projects.get(projectName);
+        const resourcesDir = path.join(project.path, 'src', 'main', 'resources');
+        const fullFilePath = path.join(resourcesDir, queryFilePath);
+
+        // Security: prevent path traversal
+        if (!path.resolve(fullFilePath).startsWith(path.resolve(resourcesDir))) {
+            return err400(res, 'File path must be within src/main/resources');
+        }
+
+        try {
+            fs.mkdirSync(path.dirname(fullFilePath), { recursive: true });
+            const exists = fs.existsSync(fullFilePath);
+            fs.writeFileSync(fullFilePath, content, 'utf8');
+
+            return send(res, 200, {
+                message: exists ? 'Resource file updated' : 'Resource file created',
+                projectName,
+                filePath: queryFilePath,
+                absolutePath: path.resolve(fullFilePath),
+                relativePath: fullFilePath,
+                exists: true,
+                action: exists ? 'updated' : 'created'
+            });
+        } catch (e) {
+            return err500(res, `Failed to write resource file: ${e.message}`);
+        }
+    }
+
+    /* ── GET /maven/resource/file – Read file from src/main/resources ──
+       Query: ?projectName=my-app&filePath=application.properties
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/resource/file' && req.method === 'GET') {
+        const { projectName, filePath: queryFilePath } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!queryFilePath) return err400(res, 'Provide ?filePath=<relative/path/to/file>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist.', projectName });
+        }
+
+        const project = projects.get(projectName);
+        const resourcesDir = path.join(project.path, 'src', 'main', 'resources');
+        const fullFilePath = path.join(resourcesDir, queryFilePath);
+
+        // Security: prevent path traversal
+        if (!path.resolve(fullFilePath).startsWith(path.resolve(resourcesDir))) {
+            return err400(res, 'File path must be within src/main/resources');
+        }
+
+        if (!fs.existsSync(fullFilePath)) {
+            return err404(res, `Resource file '${queryFilePath}' not found in project '${projectName}'`);
+        }
+
+        try {
+            const content = fs.readFileSync(fullFilePath, 'utf8');
+            const stat = fs.statSync(fullFilePath);
+
+            return send(res, 200, {
+                message: 'Resource file read successfully',
+                projectName,
+                filePath: queryFilePath,
+                absolutePath: path.resolve(fullFilePath),
+                relativePath: fullFilePath,
+                content,
+                size: stat.size
+            });
+        } catch (e) {
+            return err500(res, `Failed to read resource file: ${e.message}`);
+        }
+    }
+
+    /* ── PUT /maven/resource/file – Modify/Update file in src/main/resources ──
+       Query: ?projectName=my-app&filePath=application.yml
+       Body: { content: "..." }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/resource/file' && req.method === 'PUT') {
+        const { projectName, filePath: queryFilePath } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!queryFilePath) return err400(res, 'Provide ?filePath=<relative/path/to/file>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const { content } = body;
+        if (content === undefined || content === null) {
+            return err400(res, 'Provide { content: "..." } in body');
+        }
+
+        const project = projects.get(projectName);
+        const resourcesDir = path.join(project.path, 'src', 'main', 'resources');
+        const fullFilePath = path.join(resourcesDir, queryFilePath);
+
+        // Security: prevent path traversal
+        if (!path.resolve(fullFilePath).startsWith(path.resolve(resourcesDir))) {
+            return err400(res, 'File path must be within src/main/resources');
+        }
+
+        if (!fs.existsSync(fullFilePath)) {
+            return err404(res, `Resource file '${queryFilePath}' not found. Cannot update non-existent file.`);
+        }
+
+        try {
+            const oldContent = fs.readFileSync(fullFilePath, 'utf8');
+            fs.writeFileSync(fullFilePath, content, 'utf8');
+
+            return send(res, 200, {
+                message: 'Resource file updated successfully',
+                projectName,
+                filePath: queryFilePath,
+                absolutePath: path.resolve(fullFilePath),
+                relativePath: fullFilePath,
+                oldContentSize: oldContent.length,
+                newContentSize: content.length,
+                action: 'updated'
+            });
+        } catch (e) {
+            return err500(res, `Failed to update resource file: ${e.message}`);
+        }
+    }
+
+    /* ── GET /maven/resources – List all files in src/main/resources ──
+       Query: ?projectName=my-app
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/resources' && req.method === 'GET') {
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist.', projectName });
+        }
+
+        const project = projects.get(projectName);
+        const resourcesDir = path.join(project.path, 'src', 'main', 'resources');
+
+        if (!fs.existsSync(resourcesDir)) {
+            return send(res, 200, {
+                message: 'No src/main/resources directory found',
+                projectName,
+                resourcesDir,
+                exists: false,
+                files: []
+            });
+        }
+
+        try {
+            const files = [];
+            const walkDir = (dir, baseDir) => {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
+                    const relativePath = path.relative(baseDir, fullPath);
+                    if (entry.isDirectory()) {
+                        walkDir(fullPath, baseDir);
+                    } else {
+                        const stat = fs.statSync(fullPath);
+                        files.push({
+                            name: entry.name,
+                            relativePath,
+                            absolutePath: path.resolve(fullPath),
+                            size: stat.size,
+                            type: path.extname(entry.name) || 'file'
+                        });
+                    }
+                }
+            };
+
+            walkDir(resourcesDir, resourcesDir);
+
+            return send(res, 200, {
+                message: 'Resource files listed',
+                projectName,
+                resourcesDir: path.resolve(resourcesDir),
+                fileCount: files.length,
+                files
+            });
+        } catch (e) {
+            return err500(res, `Failed to list resource files: ${e.message}`);
+        }
+    }
+
     /* ── 404 ──────────────────────────────────────────────────── */
     send(res, 404, {
         error: 'Endpoint not found',
@@ -1857,6 +2062,10 @@ const server = http.createServer(async (req, res) => {
             'GET  /maven/dependencies?projectName=',
             'GET  /maven/plugins?projectName=',
             'POST /maven/plugin?projectName=       { groupId?, artifactId, version?, configuration?, executions? }',
+            'POST /maven/resource/file?projectName=&filePath= { content: "..." }',
+            'GET  /maven/resource/file?projectName=&filePath=',
+            'PUT  /maven/resource/file?projectName=&filePath= { content: "..." }',
+            'GET  /maven/resources?projectName=',
             'GET  /maven/build?projectName=&skipTests=true',
             'GET  /maven/jar?projectName=',
             'GET  /maven/artifact?projectName=     -- Returns JAR path info (not binary download)',
@@ -1884,6 +2093,10 @@ server.listen(PORT, () => {
     console.log('  GET  /maven/dependencies?projectName=- List project dependencies');
     console.log('  GET  /maven/plugins?projectName=     - List build plugins');
     console.log('  POST /maven/plugin?projectName=      - Add/update build plugin');
+    console.log('  POST /maven/resource/file?projectName=&filePath= - Create/add file in src/main/resources');
+    console.log('  GET  /maven/resource/file?projectName=&filePath= - Read file from src/main/resources');
+    console.log('  PUT  /maven/resource/file?projectName=&filePath= - Modify file in src/main/resources');
+    console.log('  GET  /maven/resources?projectName=   - List all files in src/main/resources');
     console.log('  GET  /maven/build?projectName=       - Build project (mvn package)');
     console.log('  GET  /maven/jar?projectName=         - Download built JAR');
     console.log('  GET  /maven/artifact?projectName=    - Get JAR file path info (not binary)');

@@ -629,6 +629,143 @@ Built as the `getProjectDetails` API to return all relevant project information 
 
 ---
 
+### `POST /maven/resource/file?projectName=&filePath=`
+
+Create or add a new file to `src/main/resources` folder. If the file already exists, it will be overwritten.
+
+**Query Parameters:**
+| Param | Required | Description |
+|---|---|---|
+| `projectName` | ✅ | Name of the project |
+| `filePath` | ✅ | Relative path to the file within `src/main/resources` (e.g., `application.yml`, `config/app.properties`) |
+
+**Body:**
+```json
+{
+  "content": "spring.application.name=my-app\nserver.port=8080"
+}
+```
+
+**Response 200:**
+```json
+{
+  "message": "Resource file created",
+  "projectName": "my-app",
+  "filePath": "application.properties",
+  "absolutePath": "/base/my-app/src/main/resources/application.properties",
+  "relativePath": "/base/my-app/src/main/resources/application.properties",
+  "exists": true,
+  "action": "created"
+}
+```
+
+**Security:** Prevents path traversal attacks – file path must remain within `src/main/resources`. Automatically creates parent directories if they don't exist.
+
+---
+
+### `GET /maven/resource/file?projectName=&filePath=`
+
+Read the content of a file from `src/main/resources` folder.
+
+**Query Parameters:**
+| Param | Required | Description |
+|---|---|---|
+| `projectName` | ✅ | Name of the project |
+| `filePath` | ✅ | Relative path to the file within `src/main/resources` |
+
+**Response 200:**
+```json
+{
+  "message": "Resource file read successfully",
+  "projectName": "my-app",
+  "filePath": "application.properties",
+  "absolutePath": "/base/my-app/src/main/resources/application.properties",
+  "relativePath": "/base/my-app/src/main/resources/application.properties",
+  "content": "spring.application.name=my-app\nserver.port=8080\nspring.jpa.hibernate.ddl-auto=update",
+  "size": 98
+}
+```
+
+**Response 404:** File not found in `src/main/resources`.
+
+---
+
+### `PUT /maven/resource/file?projectName=&filePath=`
+
+Modify or update an existing file in `src/main/resources` folder. File must exist (use POST to create new files).
+
+**Query Parameters:**
+| Param | Required | Description |
+|---|---|---|
+| `projectName` | ✅ | Name of the project |
+| `filePath` | ✅ | Relative path to the file within `src/main/resources` |
+
+**Body:**
+```json
+{
+  "content": "spring.application.name=my-app-updated\nserver.port=9090"
+}
+```
+
+**Response 200:**
+```json
+{
+  "message": "Resource file updated successfully",
+  "projectName": "my-app",
+  "filePath": "application.properties",
+  "absolutePath": "/base/my-app/src/main/resources/application.properties",
+  "relativePath": "/base/my-app/src/main/resources/application.properties",
+  "oldContentSize": 98,
+  "newContentSize": 72,
+  "action": "updated"
+}
+```
+
+**Response 404:** File not found – cannot update non-existent file.
+
+---
+
+### `GET /maven/resources?projectName=`
+
+List all files in the `src/main/resources` directory. Recursively lists all files and subdirectories.
+
+**Query:** `?projectName=my-app`
+
+**Response 200:**
+```json
+{
+  "message": "Resource files listed",
+  "projectName": "my-app",
+  "resourcesDir": "/base/my-app/src/main/resources",
+  "fileCount": 3,
+  "files": [
+    {
+      "name": "application.properties",
+      "relativePath": "application.properties",
+      "absolutePath": "/base/my-app/src/main/resources/application.properties",
+      "size": 98,
+      "type": ".properties"
+    },
+    {
+      "name": "db-config.yml",
+      "relativePath": "config/db-config.yml",
+      "absolutePath": "/base/my-app/src/main/resources/config/db-config.yml",
+      "size": 245,
+      "type": ".yml"
+    },
+    {
+      "name": "logback.xml",
+      "relativePath": "logback.xml",
+      "absolutePath": "/base/my-app/src/main/resources/logback.xml",
+      "size": 512,
+      "type": ".xml"
+    }
+  ]
+}
+```
+
+---
+
 ### `GET /maven/jar?projectName=`
 
 Download the built JAR file from `target/` as a binary attachment.
