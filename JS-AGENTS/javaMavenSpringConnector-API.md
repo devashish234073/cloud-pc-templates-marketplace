@@ -4,32 +4,23 @@
 **Base URL:** `http://localhost:3038`
 
 ## Startup
-
 ```bash
 node javaMavenSpringConnector.js [basedir]
 ```
-
 - `basedir` (optional) – directory where Maven projects are stored. Defaults to `cwd`.
-- On startup, scans `basedir` for existing Maven projects (subdirs with `pom.xml`) and registers them in memory.
+- Scans `basedir` for existing Maven projects on startup.
 
 ---
 
 ## Requirement Checks
-
-Every mutating endpoint first verifies:
-1. **Java ≥ 11** – checks `java -version`; rejects if missing or < 11
-2. **Maven** – checks `mvn --version`; rejects if missing
-
-If either check fails, the endpoint returns `500` with an error message-no work is performed.
+Mutating endpoints verify Java (>= 11 by default, or project target version) and Maven are installed.
 
 ---
 
 ## Endpoints
 
 ### `GET /health`
-
 Server status and requirement check result.
-
 **Response 200:**
 ```json
 {
@@ -46,9 +37,7 @@ Server status and requirement check result.
 ---
 
 ### `GET /maven/projects`
-
 List all tracked Maven projects.
-
 **Response 200:**
 ```json
 {
@@ -62,9 +51,7 @@ List all tracked Maven projects.
 ---
 
 ### `POST /maven/create`
-
 Create a new Maven project via `mvn archetype:generate`.
-
 **Body:**
 ```json
 {
@@ -77,35 +64,19 @@ Create a new Maven project via `mvn archetype:generate`.
   "javaVersion": "17"
 }
 ```
-
-| Field | Required | Default |
-|---|---|---|
-| `groupId` | ✅ | – |
-| `artifactId` | ✅ | – |
-| `version` | | `1.0-SNAPSHOT` |
-| `archetypeGroupId` | | `org.apache.maven.archetypes` |
-| `archetypeArtifactId` | | `maven-archetype-quickstart` |
-| `archetypeVersion` | | `1.4` |
-| `javaVersion` | | `17` |
-
-**Response 200:** Project metadata + last 500 chars of maven output.  
-**Response 409:** Project or directory already exists.
+**Response 200:**
+```json
+{
+  "message": "Project 'my-app' created successfully",
+  "project": { "name": "my-app", "path": "/base/my-app", "groupId": "com.example", "artifactId": "my-app" },
+  "mavenOutput": "..."
+}
+```
 
 ---
 
 ### `POST /spring/create`
-
-Create a configurable Spring Boot Maven application without relying on an archetype.
-
-It generates:
-- `pom.xml` from caller-supplied Maven metadata
-- application class
-- `/api/health` controller
-- `application.properties`
-- basic context-load test
-- `.gitignore`
-- `README.md`
-
+Create a configurable Spring Boot Maven application.
 **Body:**
 ```json
 {
@@ -135,24 +106,6 @@ It generates:
   }
 }
 ```
-
-| Field | Required | Default |
-|---|---|---|
-| `groupId` | ✅ | – |
-| `artifactId` | ✅ | – |
-| `packageName` | | sanitized from `groupId.artifactId` |
-| `appName` | | PascalCase from `artifactId` |
-| `version` | | `0.0.1-SNAPSHOT` |
-| `parent` | | none |
-| `properties` | | `{}` |
-| `dependencies` | | `[]` |
-| `plugins` | | `[]` |
-| `applicationProperties` | | `{}` |
-
-No dependency names are hardcoded. The caller must pass exact Maven coordinates. Dependency objects support `groupId`, `artifactId`, `version`, `type`, `classifier`, `scope`, `optional`, and `exclusions`.
-
-Plugin objects support `groupId`, `artifactId`, `version`, `extensions`, `configuration`, `configurationXml`, `executions`, `executionsXml`, or `rawXml`.
-
 **Response 200:**
 ```json
 {
@@ -173,44 +126,18 @@ Plugin objects support `groupId`, `artifactId`, `version`, `extensions`, `config
   "plugins": [
     { "groupId": "org.springframework.boot", "artifactId": "spring-boot-maven-plugin" }
   ],
-  "files": ["/base/inventory-api/pom.xml"]
-}
-```
-
-**Response 200** (with warnings):
-```json
-{
-  "message": "Spring Boot project 'inventory-api' created successfully",
-  "project": { ... },
-  "applicationClass": "com.example.inventory.InventoryApiApplication",
-  "dependencies": [ ... ],
-  "plugins": [ ... ],
-  "files": [ ... ],
+  "files": ["/base/inventory-api/pom.xml"],
   "validationWarnings": [
-    "WARNING: Spring Boot dependencies detected without parent/BOM. Consider adding spring-boot-starter-parent as parent or using spring-boot-dependencies BOM."
+    "WARNING: Spring Boot dependencies detected without parent/BOM. Consider adding spring-boot-starter-parent as parent."
   ]
 }
 ```
 
-**Validation:** If Spring Boot dependencies are detected without a parent/BOM or with unversioned dependencies, `validationWarnings` array is populated. This helps catch configuration issues that may cause Maven build failures.
-
-**Response 409:** Project or directory already exists.
-
 ---
 
 ### `POST /spring/crud?projectName=`
-
-Generate a complete CRUD resource inside a Spring Boot project.
-
-It creates:
-- JPA entity
-- request/response DTOs
-- Spring Data repository
-- service with transactions and 404 handling
-- REST controller with list/get/create/update/delete routes
-
+Generate entity, request/response DTOs, repository, service, and controller CRUD resources.
 **Query:** `?projectName=inventory-api`
-
 **Body:**
 ```json
 {
@@ -224,16 +151,6 @@ It creates:
   ]
 }
 ```
-
-| Field | Required | Default |
-|---|---|---|
-| `resourceName` | ✅ | – |
-| `packageName` | | project `packageName`, project `groupId`, or `com.example.demo` |
-| `path` | | plural kebab-case from `resourceName` |
-| `fields` | | `name` and `description` |
-
-Common supported field types include `String`, `Integer`, `Long`, `Double`, `BigDecimal`, `Boolean`, `LocalDate`, `LocalDateTime`, and `UUID`.
-
 **Response 200:**
 ```json
 {
@@ -260,9 +177,7 @@ Common supported field types include `String`, `Integer`, `Long`, `Double`, `Big
 ---
 
 ### `GET /maven/pom?projectName=&raw=true`
-
-Read structured POM information, including parent, properties, dependencies, and plugins. Add `raw=true` to include the full `pom.xml`.
-
+Read structured POM information. Add `raw=true` to include full `pom.xml`.
 **Response 200:**
 ```json
 {
@@ -284,9 +199,7 @@ Read structured POM information, including parent, properties, dependencies, and
 ---
 
 ### `PUT /maven/properties?projectName=`
-
 Add or update POM properties.
-
 **Body:**
 ```json
 {
@@ -296,13 +209,19 @@ Add or update POM properties.
   }
 }
 ```
+**Response 200:**
+```json
+{
+  "message": "POM properties updated",
+  "projectName": "my-app",
+  "properties": { "java.version": "21", "spring-cloud.version": "2023.0.3" }
+}
+```
 
 ---
 
 ### `PUT /maven/parent?projectName=`
-
 Add or update the POM parent.
-
 **Body:**
 ```json
 {
@@ -312,27 +231,25 @@ Add or update the POM parent.
   "relativePath": ""
 }
 ```
+**Response 200:**
+```json
+{
+  "message": "POM parent updated",
+  "projectName": "my-app",
+  "parent": { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-parent", "version": "3.3.5" }
+}
+```
 
 ---
 
 ### `POST /maven/class?projectName=&packageName=&className=`
-
 Create (or overwrite) a Java class.
-
-**Query Parameters:**
-| Param | Required | Example |
-|---|---|---|
-| `projectName` | ✅ | `my-app` |
-| `packageName` | ✅ | `com.example.service` |
-| `className` | ✅ | `UserService` |
-
 **Body:**
 ```json
 {
   "code": "package com.example.service;\n\npublic class UserService {\n    // ...\n}"
 }
 ```
-
 **Response 200:**
 ```json
 {
@@ -345,51 +262,58 @@ Create (or overwrite) a Java class.
 }
 ```
 
-**Response 404:** `"Project does not exist. Create the project first."`
-
 ---
 
 ### `PUT /maven/class?projectName=&packageName=&className=`
+Update (overwrite) a Java class. Identical behaviour to `POST /maven/class`.
 
-Update (overwrite) a Java class. **Identical behaviour** to `POST /maven/class` - exists for semantic REST clarity.
+---
+
+### `PATCH /maven/class?projectName=&packageName=&className=`
+Patch an existing Java class using search-and-replace block replacements.
+**Body (Single replacement):**
+```json
+{
+  "targetContent": "public class UserService {\n    // old content\n}",
+  "replacementContent": "public class UserService {\n    // new content\n}"
+}
+```
+**Body (Multiple replacements):**
+```json
+{
+  "replacements": [
+    {
+      "targetContent": "private final UserRepository repository;",
+      "replacementContent": "private final UserRepository repository;\n    private final LogService logService;"
+    }
+  ]
+}
+```
+**Response 200:**
+```json
+{
+  "message": "Class 'UserService' patched successfully",
+  "classFile": "/base/my-app/src/main/java/com/example/service/UserService.java",
+  "packageName": "com.example.service",
+  "className": "UserService",
+  "projectName": "my-app",
+  "replacementsApplied": 1
+}
+```
 
 ---
 
 ### `POST /maven/dependency?projectName=`
-
 Add or update a dependency in `pom.xml`.
-
-**Query:** `?projectName=my-app`
-
 **Body:**
 ```json
 {
   "groupId": "org.springframework.boot",
   "artifactId": "spring-boot-starter-web",
   "version": "3.2.0",
-  "type": "jar",
-  "classifier": "",
-  "scope": "compile",
-  "optional": false,
-  "exclusions": [
-    { "groupId": "commons-logging", "artifactId": "commons-logging" }
-  ]
+  "scope": "compile"
 }
 ```
-
-| Field | Required |
-|---|---|
-| `groupId` | ✅ |
-| `artifactId` | ✅ |
-| `version` | |
-| `type` | |
-| `classifier` | |
-| `scope` | |
-| `optional` | |
-| `exclusions` | |
-
-If the dependency already exists (same `groupId:artifactId`), its version/scope is **updated**.
-
 **Response 200:**
 ```json
 {
@@ -405,26 +329,29 @@ If the dependency already exists (same `groupId:artifactId`), its version/scope 
 ---
 
 ### `POST /maven/dependencies?projectName=`
-
 Add or update multiple dependencies.
-
 **Body:**
 ```json
 {
   "dependencies": [
     { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-web" },
-    { "groupId": "org.projectlombok", "artifactId": "lombok", "version": "1.18.34", "scope": "provided", "optional": true }
+    { "groupId": "org.projectlombok", "artifactId": "lombok", "version": "1.18.34", "scope": "provided" }
   ]
+}
+```
+**Response 200:**
+```json
+{
+  "message": "Dependencies processed",
+  "projectName": "my-app",
+  "dependencies": [ ... ]
 }
 ```
 
 ---
 
 ### `GET /maven/dependencies?projectName=`
-
-List all dependencies and their current versions from `pom.xml`.  
-Also attempts `mvn dependency:list` for resolved (effective) versions.
-
+List all dependencies from `pom.xml` (including resolved versions).
 **Response 200:**
 ```json
 {
@@ -442,9 +369,7 @@ Also attempts `mvn dependency:list` for resolved (effective) versions.
 ---
 
 ### `GET /maven/plugins?projectName=`
-
-List build plugins from `pom.xml`, including raw plugin XML and parsed configuration/executions XML where present.
-
+List build plugins from `pom.xml`.
 **Response 200:**
 ```json
 {
@@ -465,43 +390,29 @@ List build plugins from `pom.xml`, including raw plugin XML and parsed configura
 ---
 
 ### `POST /maven/plugin?projectName=`
-
-Add or update a build plugin. If the same `groupId:artifactId` already exists, it is replaced.
-
+Add or update a build plugin.
 **Body:**
 ```json
 {
   "groupId": "org.apache.maven.plugins",
   "artifactId": "maven-compiler-plugin",
   "version": "3.13.0",
-  "configuration": {
-    "source": "21",
-    "target": "21"
-  },
-  "executions": [
-    {
-      "id": "default-compile",
-      "phase": "compile",
-      "goals": ["compile"]
-    }
-  ]
+  "configuration": { "source": "21", "target": "21" }
 }
 ```
-
-For complex plugin XML, pass `configurationXml`, `executionsXml`, or `rawXml`.
+**Response 200:**
+```json
+{
+  "message": "Plugin added/updated",
+  "projectName": "my-app",
+  "plugins": [ ... ]
+}
+```
 
 ---
 
 ### `GET /maven/build?projectName=&skipTests=true`
-
-Build the project with `mvn package`. Extracts and returns meaningful error messages on build failure.
-
-**Query:**
-| Param | Required | Default |
-|---|---|---|
-| `projectName` | ✅ | – |
-| `skipTests` | | `false` |
-
+Build the project with `mvn package`.
 **Response 200:**
 ```json
 {
@@ -510,36 +421,15 @@ Build the project with `mvn package`. Extracts and returns meaningful error mess
   "buildSuccess": true,
   "jarFile": "/base/my-app/target/my-app-1.0-SNAPSHOT.jar",
   "errorSummary": null,
-  "mavenOutput": "...[last 1000 chars]..."
+  "mavenOutput": "..."
 }
 ```
-
-**Response 500 (on failure):** Includes `errorSummary` array with first 10 error lines extracted from Maven output:
-```json
-{
-  "message": "Build failed",
-  "projectName": "my-app",
-  "buildSuccess": false,
-  "jarFile": null,
-  "errorSummary": [
-    "[ERROR] COMPILATION ERROR",
-    "[ERROR] /path/to/file.java:[line] error message"
-  ],
-  "mavenOutput": "...[last 1000 chars]..."
-}
-```
-
-**Error Extraction:** Filters Maven output for lines containing `[ERROR]`, `FAILURE`, or `error` keywords to surface actual compilation/build errors instead of warnings.
 
 ---
 
 ### `GET /maven/artifact?projectName=`
-
-Retrieve JAR artifact metadata (path, size, coordinates) without downloading the binary.
-
-**Query:** `?projectName=my-app`
-
-**Sample Response 200:**
+Retrieve JAR artifact metadata.
+**Response 200:**
 ```json
 {
   "message": "JAR artifact information",
@@ -549,103 +439,40 @@ Retrieve JAR artifact metadata (path, size, coordinates) without downloading the
   "jarRelativePath": "target/my-app-1.0-SNAPSHOT.jar",
   "jarAbsolutePath": "/home/user/projects/my-app/target/my-app-1.0-SNAPSHOT.jar",
   "jarSize": 52428800,
-  "jarSizeKB": 51200,
   "groupId": "com.example",
   "artifactId": "my-app",
   "packageName": "com.example.myapp"
 }
 ```
 
-**Response 404:** No JAR found – build the project first with `/maven/build`.
-
-**Path Fields:** `jarPath` returns the **absolute system path** (full path to JAR). Use this for CI/CD pipelines and file operations. `jarRelativePath` is the relative path from the project directory for reference.
-
-
 ---
 
 ### `GET /maven/project-details?projectName=`
-
-Retrieve complete project information including POM details, source directories, and build artifacts. All path fields return **absolute system paths** for CI/CD integration.
-
-**Query:** `?projectName=my-app`
-
+Retrieve complete project details (POM info, source directories, JAR artifacts, target directory).
 **Response 200:**
 ```json
 {
   "message": "Complete project details",
   "projectName": "my-app",
-  "projectInfo": {
-    "name": "my-app",
-    "path": "/home/user/projects/my-app",
-    "relativePath": "my-app",
-    "absolutePath": "/home/user/projects/my-app",
-    "groupId": "com.example",
-    "artifactId": "my-app",
-    "packageName": "com.example.myapp",
-    "type": "spring-boot",
-    "createdAt": "2026-05-01T12:00:00.000Z"
-  },
-  "pomInfo": {
-    "path": "/home/user/projects/my-app/pom.xml",
-    "relativePath": "pom.xml",
-    "exists": true,
-    "summary": {
-      "groupId": "com.example",
-      "artifactId": "my-app",
-      "version": "1.0-SNAPSHOT",
-      "parent": { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-parent", "version": "3.3.5" },
-      "properties": { "java.version": "17" },
-      "dependencies": [ ... ],
-      "plugins": [ ... ]
-    }
-  },
-  "sourceDirs": {
-    "mainJava": "/home/user/projects/my-app/src/main/java",
-    "mainJavaRelative": "src/main/java",
-    "testJava": "/home/user/projects/my-app/src/test/java",
-    "testJavaRelative": "src/test/java",
-    "mainJavaExists": true,
-    "testJavaExists": true
-  },
-  "buildArtifact": {
-    "name": "my-app-1.0-SNAPSHOT.jar",
-    "path": "/home/user/projects/my-app/target/my-app-1.0-SNAPSHOT.jar",
-    "relativePath": "target/my-app-1.0-SNAPSHOT.jar",
-    "absolutePath": "/home/user/projects/my-app/target/my-app-1.0-SNAPSHOT.jar",
-    "size": 52428800,
-    "sizeKB": 51200
-  },
-  "targetDir": {
-    "path": "/home/user/projects/my-app/target",
-    "relativePath": "target",
-    "exists": true
-  }
+  "projectInfo": { "name": "my-app", "path": "/home/user/projects/my-app", "groupId": "com.example", "type": "spring-boot" },
+  "pomInfo": { "exists": true, "summary": { ... } },
+  "sourceDirs": { "mainJava": "...", "testJava": "...", "mainJavaExists": true, "testJavaExists": true },
+  "buildArtifact": { "name": "...", "path": "...", "size": 52428800 },
+  "targetDir": { "path": "...", "exists": true }
 }
 ```
-
-**Path Fields:** All `.path` fields return the **absolute system path** (recommended for scripts and automation). `.relativePath` fields provide relative paths from the project root for reference.
-
-Built as the `getProjectDetails` API to return all relevant project information in one call.
 
 ---
 
 ### `POST /maven/resource/file?projectName=&filePath=`
-
-Create or add a new file to `src/main/resources` folder. If the file already exists, it will be overwritten.
-
-**Query Parameters:**
-| Param | Required | Description |
-|---|---|---|
-| `projectName` | ✅ | Name of the project |
-| `filePath` | ✅ | Relative path to the file within `src/main/resources` (e.g., `application.yml`, `config/app.properties`) |
-
+Create or add a new file to `src/main/resources`.
+**Query Parameters:** `?projectName=my-app&filePath=application.properties`
 **Body:**
 ```json
 {
   "content": "spring.application.name=my-app\nserver.port=8080"
 }
 ```
-
 **Response 200:**
 ```json
 {
@@ -653,113 +480,94 @@ Create or add a new file to `src/main/resources` folder. If the file already exi
   "projectName": "my-app",
   "filePath": "application.properties",
   "absolutePath": "/base/my-app/src/main/resources/application.properties",
-  "relativePath": "/base/my-app/src/main/resources/application.properties",
   "exists": true,
   "action": "created"
 }
 ```
 
-**Security:** Prevents path traversal attacks – file path must remain within `src/main/resources`. Automatically creates parent directories if they don't exist.
-
 ---
 
 ### `GET /maven/resource/file?projectName=&filePath=`
-
-Read the content of a file from `src/main/resources` folder.
-
-**Query Parameters:**
-| Param | Required | Description |
-|---|---|---|
-| `projectName` | ✅ | Name of the project |
-| `filePath` | ✅ | Relative path to the file within `src/main/resources` |
-
+Read content of a file from `src/main/resources`.
 **Response 200:**
 ```json
 {
   "message": "Resource file read successfully",
   "projectName": "my-app",
   "filePath": "application.properties",
-  "absolutePath": "/base/my-app/src/main/resources/application.properties",
-  "relativePath": "/base/my-app/src/main/resources/application.properties",
-  "content": "spring.application.name=my-app\nserver.port=8080\nspring.jpa.hibernate.ddl-auto=update",
+  "content": "spring.application.name=my-app\nserver.port=8080",
   "size": 98
 }
 ```
 
-**Response 404:** File not found in `src/main/resources`.
-
 ---
 
 ### `PUT /maven/resource/file?projectName=&filePath=`
-
-Modify or update an existing file in `src/main/resources` folder. File must exist (use POST to create new files).
-
-**Query Parameters:**
-| Param | Required | Description |
-|---|---|---|
-| `projectName` | ✅ | Name of the project |
-| `filePath` | ✅ | Relative path to the file within `src/main/resources` |
-
+Modify or update an existing file in `src/main/resources`.
 **Body:**
 ```json
 {
   "content": "spring.application.name=my-app-updated\nserver.port=9090"
 }
 ```
-
 **Response 200:**
 ```json
 {
   "message": "Resource file updated successfully",
   "projectName": "my-app",
   "filePath": "application.properties",
-  "absolutePath": "/base/my-app/src/main/resources/application.properties",
-  "relativePath": "/base/my-app/src/main/resources/application.properties",
   "oldContentSize": 98,
   "newContentSize": 72,
   "action": "updated"
 }
 ```
 
-**Response 404:** File not found – cannot update non-existent file.
+---
+
+### `PATCH /maven/resource/file?projectName=&filePath=`
+Patch an existing resource file using search-and-replace block replacements.
+**Body (Single replacement):**
+```json
+{
+  "targetContent": "server.port=8080",
+  "replacementContent": "server.port=9090"
+}
+```
+**Body (Multiple replacements):**
+```json
+{
+  "replacements": [
+    {
+      "targetContent": "spring.application.name=my-app",
+      "replacementContent": "spring.application.name=my-cool-app"
+    }
+  ]
+}
+```
+**Response 200:**
+```json
+{
+  "message": "Resource file 'application.properties' patched successfully",
+  "projectName": "my-app",
+  "filePath": "application.properties",
+  "absolutePath": "/base/my-app/src/main/resources/application.properties",
+  "replacementsApplied": 1
+}
+```
 
 ---
 
 ### `GET /maven/resources?projectName=`
-
-List all files in the `src/main/resources` directory. Recursively lists all files and subdirectories.
-
-**Query:** `?projectName=my-app`
-
+List all files recursively in the `src/main/resources` directory.
 **Response 200:**
 ```json
 {
   "message": "Resource files listed",
   "projectName": "my-app",
   "resourcesDir": "/base/my-app/src/main/resources",
-  "fileCount": 3,
+  "fileCount": 1,
   "files": [
-    {
-      "name": "application.properties",
-      "relativePath": "application.properties",
-      "absolutePath": "/base/my-app/src/main/resources/application.properties",
-      "size": 98,
-      "type": ".properties"
-    },
-    {
-      "name": "db-config.yml",
-      "relativePath": "config/db-config.yml",
-      "absolutePath": "/base/my-app/src/main/resources/config/db-config.yml",
-      "size": 245,
-      "type": ".yml"
-    },
-    {
-      "name": "logback.xml",
-      "relativePath": "logback.xml",
-      "absolutePath": "/base/my-app/src/main/resources/logback.xml",
-      "size": 512,
-      "type": ".xml"
-    }
+    { "name": "application.properties", "relativePath": "application.properties", "size": 98, "type": ".properties" }
   ]
 }
 ```
@@ -767,18 +575,13 @@ List all files in the `src/main/resources` directory. Recursively lists all file
 ---
 
 ### `GET /maven/jar?projectName=`
-
-Download the built JAR file from `target/` as a binary attachment.
-
-**Response 200:** Binary stream with `Content-Type: application/java-archive`.  
-**Response 404:** No target dir or no JAR found – build first.
+Download built JAR file from `target/`.
+**Response 200:** Binary stream with `Content-Type: application/java-archive`.
 
 ---
 
 ### `GET /maven/rescan`
-
-Clear the in-memory project map and re-scan `basedir` for Maven projects.
-
+Rescan `basedir` for Maven projects.
 **Response 200:**
 ```json
 {

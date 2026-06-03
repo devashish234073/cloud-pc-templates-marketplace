@@ -105,12 +105,24 @@ function scanExistingProjects() {
     console.log(`Projects after scan: ${projects.size}`, [...projects.keys()]);
 }
 
-/** Extract groupId from a pom.xml (simple regex – not a full XML parser) */
+/** Extract groupId from a pom.xml safely */
 function parseGroupIdFromPom(pomPath) {
     try {
         const content = fs.readFileSync(pomPath, 'utf8');
-        const match = content.match(/<groupId>([^<]+)<\/groupId>/);
-        return match ? match[1].trim() : 'unknown';
+        const header = content
+            .replace(/<parent>[\s\S]*?<\/parent>/g, '')
+            .replace(/<dependencies>[\s\S]*?<\/dependencies>/g, '')
+            .replace(/<dependencyManagement>[\s\S]*?<\/dependencyManagement>/g, '')
+            .replace(/<build>[\s\S]*?<\/build>/g, '');
+        const match = header.match(/<groupId>([^<]+)<\/groupId>/);
+        if (match) return match[1].trim();
+        // Fallback to parent groupId if root has none defined directly
+        const parentBlock = content.match(/<parent>([\s\S]*?)<\/parent>/);
+        if (parentBlock) {
+            const parentMatch = parentBlock[1].match(/<groupId>([^<]+)<\/groupId>/);
+            if (parentMatch) return parentMatch[1].trim();
+        }
+        return 'unknown';
     } catch { return 'unknown'; }
 }
 
@@ -157,7 +169,7 @@ function checkJava() {
         exec('java -version 2>&1', (jErr, jOut) => {
             if (jErr && !jOut) {
                 // NOT found – do NOT cache
-                return resolve({ ok: false, error: 'Java is not installed. Please install Java 11 or newer.' });
+                return resolve({ ok: false, error: 'Java is not installed. Please install a Java JDK.' });
             }
 
             const javaOutput = (jOut || '').toString();
@@ -176,12 +188,8 @@ function checkJava() {
                 majorVersion = parseInt(rawVersion.split('.')[0], 10);
             }
 
-            if (isNaN(majorVersion) || majorVersion < 11) {
-                // Version too low – do NOT cache
-                return resolve({
-                    ok: false,
-                    error: `Java version ${rawVersion} (major ${majorVersion}) is older than 11. Please upgrade to Java 11 or newer.`
-                });
+            if (isNaN(majorVersion)) {
+                return resolve({ ok: false, error: 'Could not parse Java major version from ' + rawVersion });
             }
 
             // Valid – cache the result
@@ -229,9 +237,18 @@ function checkMaven() {
  *
  * Uses per-tool 30-minute caches; failures are never cached.
  */
-async function checkRequirements() {
+async function checkRequirements(minJavaVersion = 11) {
     const java = await checkJava();
     if (!java.ok) return { ok: false, error: java.error };
+
+    if (java.major < minJavaVersion) {
+        return {
+            ok: false,
+            error: `Java version ${java.version} (major ${java.major}) is older than the required version ${minJavaVersion}. Please upgrade your Java JDK.`,
+            javaVersion: java.version,
+            javaMajor: java.major
+        };
+    }
 
     const maven = await checkMaven();
     if (!maven.ok) return { ok: false, error: maven.error, javaVersion: java.version };
@@ -323,6 +340,49 @@ function parseDependencies(pomPath) {
     return deps;
 }
 
+function findDependencyBlockRange(content, groupId, artifactId) {
+    const depRegex = /<dependency>([\s\S]*?)<\/dependency>/g;
+    let match;
+    const gEsc = escapeRegex(groupId);
+    const aEsc = escapeRegex(artifactId);
+    const gRegex = new RegExp(`<groupId>\\s*${gEsc}\\s*</groupId>`);
+    const aRegex = new RegExp(`<artifactId>\\s*${aEsc}\\s*</artifactId>`);
+    
+    while ((match = depRegex.exec(content)) !== null) {
+        const block = match[1];
+        if (gRegex.test(block) && aRegex.test(block)) {
+            return {
+                start: match.index,
+                end: match.index + match[0].length,
+                content: match[0]
+            };
+        }
+    }
+    return null;
+}
+
+function findPluginBlockRange(content, groupId, artifactId) {
+    const pluginRegex = /<plugin>([\s\S]*?)<\/plugin>/g;
+    let match;
+    const gEsc = escapeRegex(groupId);
+    const aEsc = escapeRegex(artifactId);
+    const gRegex = new RegExp(`<groupId>\\s*${gEsc}\\s*</groupId>`);
+    const aRegex = new RegExp(`<artifactId>\\s*${aEsc}\\s*</artifactId>`);
+    
+    while ((match = pluginRegex.exec(content)) !== null) {
+        const block = match[1];
+        const hasGroupId = gRegex.test(block) || (!block.includes('<groupId>') && groupId === 'org.apache.maven.plugins');
+        if (hasGroupId && aRegex.test(block)) {
+            return {
+                start: match.index,
+                end: match.index + match[0].length,
+                content: match[0]
+            };
+        }
+    }
+    return null;
+}
+
 /**
  * Add a dependency to pom.xml.
  * If the dependency already exists (same groupId:artifactId), its version is updated.
@@ -333,15 +393,12 @@ function addDependencyToPom(pomPath, groupId, artifactId, version, scope, option
 
     const depBlock = renderDependencyBlock(dependency, 4);
 
-    // Check if dependency already exists
-    const existingRegex = new RegExp(
-        `<dependency>\\s*<groupId>\\s*${escapeRegex(groupId)}\\s*</groupId>\\s*<artifactId>\\s*${escapeRegex(artifactId)}\\s*</artifactId>[\\s\\S]*?</dependency>`,
-        'g'
-    );
+    // Check if dependency already exists using robust range matching
+    const range = findDependencyBlockRange(content, groupId, artifactId);
 
-    if (existingRegex.test(content)) {
+    if (range) {
         // Replace existing
-        content = content.replace(existingRegex, depBlock);
+        content = content.slice(0, range.start) + depBlock + content.slice(range.end);
         fs.writeFileSync(pomPath, content, 'utf8');
         return { action: 'updated', groupId, artifactId, version };
     }
@@ -481,6 +538,7 @@ function parsePomSummary(pomPath) {
     const projectHeader = content
         .replace(/<parent>[\s\S]*?<\/parent>/g, '')
         .replace(/<dependencies>[\s\S]*?<\/dependencies>/g, '')
+        .replace(/<dependencyManagement>[\s\S]*?<\/dependencyManagement>/g, '')
         .replace(/<build>[\s\S]*?<\/build>/g, '');
     const parentBlock = parseXmlSection(content, 'parent');
     return {
@@ -502,11 +560,17 @@ function upsertPropertiesInPom(pomPath, properties) {
     let content = fs.readFileSync(pomPath, 'utf8');
     let propsBlock = parseXmlSection(content, 'properties');
     if (propsBlock === null) {
-        const rendered = `  <properties>\n${Object.entries(properties).map(([key, value]) => xmlTag(key, value, 4)).join('')}  </properties>`;
-        content = content.replace('</project>', `${rendered}\n</project>`);
+        const rendered = `  <properties>\n${Object.entries(properties).map(([key, value]) => xmlTag(key, value, 4)).join('')}  </properties>\n`;
+        if (content.includes('</parent>')) {
+            content = content.replace('</parent>', '</parent>\n\n' + rendered);
+        } else if (content.includes('</version>')) {
+            content = content.replace('</version>', '</version>\n\n' + rendered);
+        } else if (content.includes('</project>')) {
+            content = content.replace('</project>', rendered + '\n</project>');
+        }
     } else {
         for (const [key, value] of Object.entries(properties)) {
-            const tagRegex = new RegExp(`<${escapeRegex(key)}>[^<]*</${escapeRegex(key)}>`);
+            const tagRegex = new RegExp(`<${escapeRegex(key)}>\\s*[\\s\\S]*?\\s*</${escapeRegex(key)}>`);
             const tag = xmlTag(key, value, 4).trim();
             if (tagRegex.test(propsBlock)) {
                 propsBlock = propsBlock.replace(tagRegex, tag);
@@ -541,13 +605,11 @@ function upsertPluginInPom(pomPath, plugin) {
     const artifactId = plugin.artifactId;
     if (!artifactId && !plugin.rawXml) return { error: 'Provide plugin artifactId or rawXml' };
     const block = renderPluginBlock({ ...plugin, groupId }, 6);
-    const existingRegex = new RegExp(
-        `<plugin>\\s*(?:<groupId>\\s*${escapeRegex(groupId)}\\s*</groupId>\\s*)?<artifactId>\\s*${escapeRegex(artifactId)}\\s*</artifactId>[\\s\\S]*?</plugin>`,
-        'g'
-    );
 
-    if (artifactId && existingRegex.test(content)) {
-        content = content.replace(existingRegex, block);
+    const range = findPluginBlockRange(content, groupId, artifactId);
+
+    if (artifactId && range) {
+        content = content.slice(0, range.start) + block + content.slice(range.end);
         fs.writeFileSync(pomPath, content, 'utf8');
         return { action: 'updated', groupId, artifactId };
     }
@@ -850,10 +912,6 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/create' && req.method === 'POST') {
-        // Requirement check
-        const reqs = await checkRequirements();
-        if (!reqs.ok) return send(res, 500, { error: reqs.error });
-
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -866,6 +924,11 @@ const server = http.createServer(async (req, res) => {
             archetypeVersion = '1.4',
             javaVersion = '17'
         } = body;
+
+        const targetJava = parseInt(javaVersion, 10) || 17;
+        // Requirement check using the dynamic javaVersion requested
+        const reqs = await checkRequirements(targetJava);
+        if (!reqs.ok) return send(res, 500, { error: reqs.error });
 
         if (!groupId || !artifactId) {
             return err400(res, 'Provide { groupId, artifactId } in body');
@@ -950,9 +1013,6 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/spring/create' && req.method === 'POST') {
-        const reqs = await checkRequirements();
-        if (!reqs.ok) return send(res, 500, { error: reqs.error });
-
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -967,6 +1027,14 @@ const server = http.createServer(async (req, res) => {
             plugins,
             applicationProperties = {}
         } = body;
+
+        // Determine minJavaVersion requirement dynamically
+        const parentVersion = parent && parent.version ? String(parent.version) : '';
+        const isSpringBoot3 = parentVersion.startsWith('3.');
+        const targetJava = properties && properties['java.version'] ? parseInt(properties['java.version'], 10) : (isSpringBoot3 ? 17 : 11);
+
+        const reqs = await checkRequirements(targetJava);
+        if (!reqs.ok) return send(res, 500, { error: reqs.error });
 
         if (!groupId || !artifactId) return err400(res, 'Provide { groupId, artifactId } in body');
         if (!/^[A-Za-z0-9_.-]+$/.test(artifactId)) return err400(res, 'artifactId may contain only letters, numbers, dot, underscore, and hyphen');
@@ -1376,6 +1444,89 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
+    /* ── PATCH /maven/class – Patch/edit a Java class ──────────
+       Query: ?projectName=my-app&packageName=com.example.service&className=UserService
+       Body: {
+         targetContent?: "...",
+         replacementContent?: "...",
+         replacements?: [{ targetContent, replacementContent }]
+       }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/class' && req.method === 'PATCH') {
+        const reqs = await checkRequirements();
+        if (!reqs.ok) return send(res, 500, { error: reqs.error });
+
+        const { projectName, packageName, className } = query;
+
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!packageName) return err400(res, 'Provide ?packageName=<package>');
+        if (!className) return err400(res, 'Provide ?className=<ClassName>');
+
+        // Check if project exists
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist. Create the project first.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const project = projects.get(projectName);
+        const packagePath = packageName.replace(/\./g, path.sep);
+        const classDir = path.join(project.path, 'src', 'main', 'java', packagePath);
+        const classFile = path.join(classDir, `${className}.java`);
+
+        if (!fs.existsSync(classFile)) {
+            return err404(res, `Class file '${className}.java' does not exist in package '${packageName}' of project '${projectName}'. Create it first with POST.`);
+        }
+
+        let code = fs.readFileSync(classFile, 'utf8');
+
+        // Extract list of replacements
+        let replacementsList = [];
+        if (body.targetContent !== undefined && body.replacementContent !== undefined) {
+            replacementsList.push({ targetContent: body.targetContent, replacementContent: body.replacementContent });
+        } else if (Array.isArray(body.replacements)) {
+            replacementsList = body.replacements;
+        }
+
+        if (replacementsList.length === 0) {
+            return err400(res, 'Provide either { targetContent, replacementContent } or { replacements: [...] } in body');
+        }
+
+        // Apply replacements
+        for (let i = 0; i < replacementsList.length; i++) {
+            const { targetContent, replacementContent } = replacementsList[i];
+            if (targetContent === undefined || replacementContent === undefined) {
+                return err400(res, `Replacement at index ${i} is missing targetContent or replacementContent`);
+            }
+
+            // Find occurrence count of targetContent
+            const occurrences = code.split(targetContent).length - 1;
+            if (occurrences === 0) {
+                return err400(res, `Target content not found in file: "${targetContent.substring(0, 100)}..."`);
+            }
+            if (occurrences > 1) {
+                return err400(res, `Target content is not unique (found ${occurrences} occurrences): "${targetContent.substring(0, 100)}..."`);
+            }
+
+            code = code.replace(targetContent, replacementContent);
+        }
+
+        try {
+            fs.writeFileSync(classFile, code, 'utf8');
+            return send(res, 200, {
+                message: `Class '${className}' patched successfully`,
+                classFile,
+                packageName,
+                className,
+                projectName,
+                replacementsApplied: replacementsList.length
+            });
+        } catch (e) {
+            return err500(res, `Failed to write patched class file: ${e.message}`);
+        }
+    }
+
     /* ── POST /maven/dependency – Add dependency to pom.xml ───
        Query: ?projectName=my-app
        Body: {
@@ -1606,10 +1757,6 @@ const server = http.createServer(async (req, res) => {
        Query: ?projectName=my-app&skipTests=true
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/build' && req.method === 'GET') {
-        // Requirement check
-        const reqs = await checkRequirements();
-        if (!reqs.ok) return send(res, 500, { error: reqs.error });
-
         const { projectName, skipTests } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
 
@@ -1618,6 +1765,27 @@ const server = http.createServer(async (req, res) => {
         }
 
         const project = projects.get(projectName);
+        const pomPath = path.join(project.path, 'pom.xml');
+        
+        let minJavaVersion = 11;
+        if (fs.existsSync(pomPath)) {
+            try {
+                const summary = parsePomSummary(pomPath);
+                const parentVersion = summary.parent && summary.parent.version ? String(summary.parent.version) : '';
+                const isSpringBoot3 = parentVersion.startsWith('3.');
+                const pomJava = summary.properties && (summary.properties['java.version'] || summary.properties['maven.compiler.source'] || summary.properties['maven.compiler.target']);
+                if (pomJava) {
+                    minJavaVersion = parseInt(pomJava, 10) || minJavaVersion;
+                } else if (isSpringBoot3) {
+                    minJavaVersion = 17;
+                }
+            } catch (e) {
+                // fallback to 11
+            }
+        }
+
+        const reqs = await checkRequirements(minJavaVersion);
+        if (!reqs.ok) return send(res, 500, { error: reqs.error });
         const skipTestsFlag = skipTests === 'true' || skipTests === '1' ? ' -DskipTests' : '';
         const mvnCmd = `mvn package${skipTestsFlag}`;
 
@@ -1983,6 +2151,87 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
+    /* ── PATCH /maven/resource/file – Patch/edit a resource file ──
+       Query: ?projectName=my-app&filePath=application.properties
+       Body: {
+         targetContent?: "...",
+         replacementContent?: "...",
+         replacements?: [{ targetContent, replacementContent }]
+       }
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/resource/file' && req.method === 'PATCH') {
+        const { projectName, filePath: queryFilePath } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!queryFilePath) return err400(res, 'Provide ?filePath=<relative/path/to/file>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist.', projectName });
+        }
+
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const project = projects.get(projectName);
+        const resourcesDir = path.join(project.path, 'src', 'main', 'resources');
+        const fullFilePath = path.join(resourcesDir, queryFilePath);
+
+        // Security: prevent path traversal
+        if (!path.resolve(fullFilePath).startsWith(path.resolve(resourcesDir))) {
+            return err400(res, 'File path must be within src/main/resources');
+        }
+
+        if (!fs.existsSync(fullFilePath)) {
+            return err404(res, `Resource file '${queryFilePath}' not found. Create it first.`);
+        }
+
+        let content = fs.readFileSync(fullFilePath, 'utf8');
+
+        // Extract list of replacements
+        let replacementsList = [];
+        if (body.targetContent !== undefined && body.replacementContent !== undefined) {
+            replacementsList.push({ targetContent: body.targetContent, replacementContent: body.replacementContent });
+        } else if (Array.isArray(body.replacements)) {
+            replacementsList = body.replacements;
+        }
+
+        if (replacementsList.length === 0) {
+            return err400(res, 'Provide either { targetContent, replacementContent } or { replacements: [...] } in body');
+        }
+
+        // Apply replacements
+        for (let i = 0; i < replacementsList.length; i++) {
+            const { targetContent, replacementContent } = replacementsList[i];
+            if (targetContent === undefined || replacementContent === undefined) {
+                return err400(res, `Replacement at index ${i} is missing targetContent or replacementContent`);
+            }
+
+            // Find occurrence count of targetContent
+            const occurrences = content.split(targetContent).length - 1;
+            if (occurrences === 0) {
+                return err400(res, `Target content not found in resource file: "${targetContent.substring(0, 100)}..."`);
+            }
+            if (occurrences > 1) {
+                return err400(res, `Target content is not unique in resource file (found ${occurrences} occurrences): "${targetContent.substring(0, 100)}..."`);
+            }
+
+            content = content.replace(targetContent, replacementContent);
+        }
+
+        try {
+            fs.writeFileSync(fullFilePath, content, 'utf8');
+            return send(res, 200, {
+                message: `Resource file '${queryFilePath}' patched successfully`,
+                projectName,
+                filePath: queryFilePath,
+                absolutePath: path.resolve(fullFilePath),
+                relativePath: fullFilePath,
+                replacementsApplied: replacementsList.length
+            });
+        } catch (e) {
+            return err500(res, `Failed to patch resource file: ${e.message}`);
+        }
+    }
+
     /* ── GET /maven/resources – List all files in src/main/resources ──
        Query: ?projectName=my-app
        ─────────────────────────────────────────────────────────── */
@@ -2057,6 +2306,7 @@ const server = http.createServer(async (req, res) => {
             'PUT  /maven/parent?projectName=      { groupId, artifactId, version, relativePath? }',
             'POST /maven/class?projectName=&packageName=&className=    { code: "..." }',
             'PUT  /maven/class?projectName=&packageName=&className=    { code: "..." }',
+            'PATCH /maven/class?projectName=&packageName=&className=   { targetContent?, replacementContent?, replacements? }',
             'POST /maven/dependency?projectName=   { groupId, artifactId, version?, scope? }',
             'POST /maven/dependencies?projectName= { dependencies: [...] }',
             'GET  /maven/dependencies?projectName=',
@@ -2065,6 +2315,7 @@ const server = http.createServer(async (req, res) => {
             'POST /maven/resource/file?projectName=&filePath= { content: "..." }',
             'GET  /maven/resource/file?projectName=&filePath=',
             'PUT  /maven/resource/file?projectName=&filePath= { content: "..." }',
+            'PATCH /maven/resource/file?projectName=&filePath= { targetContent?, replacementContent?, replacements? }',
             'GET  /maven/resources?projectName=',
             'GET  /maven/build?projectName=&skipTests=true',
             'GET  /maven/jar?projectName=',
@@ -2088,6 +2339,7 @@ server.listen(PORT, () => {
     console.log('  PUT  /maven/parent?projectName=      - Add/update POM parent');
     console.log('  POST /maven/class?projectName=&...   - Create a Java class');
     console.log('  PUT  /maven/class?projectName=&...   - Update a Java class');
+    console.log('  PATCH /maven/class?projectName=&...  - Patch a Java class (search & replace)');
     console.log('  POST /maven/dependency?projectName=  - Add/update dependency in pom.xml');
     console.log('  POST /maven/dependencies?projectName=- Add/update multiple dependencies');
     console.log('  GET  /maven/dependencies?projectName=- List project dependencies');
@@ -2096,6 +2348,7 @@ server.listen(PORT, () => {
     console.log('  POST /maven/resource/file?projectName=&filePath= - Create/add file in src/main/resources');
     console.log('  GET  /maven/resource/file?projectName=&filePath= - Read file from src/main/resources');
     console.log('  PUT  /maven/resource/file?projectName=&filePath= - Modify file in src/main/resources');
+    console.log('  PATCH /maven/resource/file?projectName=&filePath= - Patch file in src/main/resources (search & replace)');
     console.log('  GET  /maven/resources?projectName=   - List all files in src/main/resources');
     console.log('  GET  /maven/build?projectName=       - Build project (mvn package)');
     console.log('  GET  /maven/jar?projectName=         - Download built JAR');
