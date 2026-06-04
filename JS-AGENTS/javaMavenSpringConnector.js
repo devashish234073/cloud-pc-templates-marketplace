@@ -856,7 +856,13 @@ function renderController(packageName, entityName, resourcePath) {
 function execPromise(cmd, opts = {}) {
     return new Promise((resolve, reject) => {
         exec(cmd, { maxBuffer: 10 * 1024 * 1024, ...opts }, (err, stdout, stderr) => {
-            if (err) return reject(new Error(stderr ? stderr.trim() : err.message));
+            if (err) {
+                const error = new Error(stderr ? stderr.trim() : err.message);
+                error.stdout = stdout;
+                error.stderr = stderr;
+                error.code = err.code;
+                return reject(error);
+            }
             resolve(stdout.trim());
         });
     });
@@ -1796,37 +1802,47 @@ const server = http.createServer(async (req, res) => {
         const skipTestsFlag = skipTests === 'true' || skipTests === '1' ? ' -DskipTests' : '';
         const mvnCmd = `mvn package${skipTestsFlag}`;
 
+        let output = '';
+        let buildSuccess = false;
+        let fallbackError = '';
         try {
-            const output = await execPromise(mvnCmd, { cwd: project.path, timeout: 300000 });
-            const buildSuccess = output.includes('BUILD SUCCESS');
+            output = await execPromise(mvnCmd, { cwd: project.path, timeout: 300000 });
+            buildSuccess = output.includes('BUILD SUCCESS');
+        } catch (e) {
+            output = e.stdout || '';
+            buildSuccess = false;
+            fallbackError = e.message;
+        }
 
-            // Find the generated JAR
-            const targetDir = path.join(project.path, 'target');
-            let jarFile = null;
-            if (fs.existsSync(targetDir)) {
-                const files = fs.readdirSync(targetDir);
-                jarFile = files.find(f => f.endsWith('.jar') && !f.endsWith('-sources.jar') && !f.endsWith('-javadoc.jar'));
-            }
+        // Find the generated JAR
+        const targetDir = path.join(project.path, 'target');
+        let jarFile = null;
+        if (buildSuccess && fs.existsSync(targetDir)) {
+            const files = fs.readdirSync(targetDir);
+            jarFile = files.find(f => f.endsWith('.jar') && !f.endsWith('-sources.jar') && !f.endsWith('-javadoc.jar'));
+        }
 
-            // Extract meaningful error lines if build failed
-            let errorLines = [];
-            if (!buildSuccess) {
+        // Extract meaningful error lines if build failed
+        let errorLines = [];
+        if (!buildSuccess) {
+            if (output) {
                 errorLines = output.split('\n')
                     .filter(line => line.includes('[ERROR]') || line.includes('FAILURE') || line.includes('error'))
                     .slice(0, 10);
             }
-
-            return send(res, buildSuccess ? 200 : 500, {
-                message: buildSuccess ? 'Build successful' : 'Build failed',
-                projectName,
-                buildSuccess,
-                jarFile: jarFile ? path.join(targetDir, jarFile) : null,
-                errorSummary: errorLines.length > 0 ? errorLines : null,
-                mavenOutput: output.substring(Math.max(0, output.length - 1000)) // last 1000 chars
-            });
-        } catch (e) {
-            return err500(res, `Build failed: ${e.message}`);
+            if (errorLines.length === 0) {
+                errorLines = [fallbackError || 'Build failed with non-zero exit code'];
+            }
         }
+
+        return send(res, buildSuccess ? 200 : 500, {
+            message: buildSuccess ? 'Build successful' : 'Build failed',
+            projectName,
+            buildSuccess,
+            jarFile: jarFile ? path.join(targetDir, jarFile) : null,
+            errorSummary: errorLines.length > 0 ? errorLines : null,
+            mavenOutput: output.substring(Math.max(0, output.length - 1000)) // last 1000 chars
+        });
     }
 
     /* ── GET /maven/jar – Download the JAR from target/ ───────
