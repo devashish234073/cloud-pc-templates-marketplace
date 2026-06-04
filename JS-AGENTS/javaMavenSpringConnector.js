@@ -286,8 +286,13 @@ function readBody(req) {
    ================================================================ */
 
 function send(res, status, data) {
-    res.writeHead(status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data, null, 2));
+    if (status >= 400) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status, ...data }, null, 2));
+    } else {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data, null, 2));
+    }
 }
 
 function sendFile(res, filePath) {
@@ -1835,7 +1840,8 @@ const server = http.createServer(async (req, res) => {
             }
         }
 
-        return send(res, buildSuccess ? 200 : 500, {
+        // Return 200 even on compilation failure so the orchestrator gets the JSON body containing errorSummary
+        return send(res, 200, {
             message: buildSuccess ? 'Build successful' : 'Build failed',
             projectName,
             buildSuccess,
