@@ -77,6 +77,7 @@ Create a new Maven project via `mvn archetype:generate`.
 
 ### `POST /spring/create`
 Create a configurable Spring Boot Maven application.
+- `parent` (optional) – Defaults to `org.springframework.boot:spring-boot-starter-parent` version `3.3.5` if omitted to ensure dependency versions are resolved correctly.
 **Body:**
 ```json
 {

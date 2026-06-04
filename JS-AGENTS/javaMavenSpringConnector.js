@@ -1021,12 +1021,19 @@ const server = http.createServer(async (req, res) => {
             artifactId,
             version = '0.0.1-SNAPSHOT',
             packaging,
-            parent,
             properties = {},
             dependencies,
             plugins,
             applicationProperties = {}
         } = body;
+
+        // Default parent to spring-boot-starter-parent if omitted
+        const parent = body.parent || {
+            groupId: 'org.springframework.boot',
+            artifactId: 'spring-boot-starter-parent',
+            version: '3.3.5',
+            relativePath: ''
+        };
 
         // Determine minJavaVersion requirement dynamically
         const parentVersion = parent && parent.version ? String(parent.version) : '';
