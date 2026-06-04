@@ -459,6 +459,7 @@ Retrieve complete project details (POM info, source directories, JAR artifacts, 
   "pomInfo": { "exists": true, "summary": { ... } },
   "sourceDirs": { "mainJava": "...", "testJava": "...", "mainJavaExists": true, "testJavaExists": true },
   "buildArtifact": { "name": "...", "path": "...", "size": 52428800 },
+  "lastBuild": { "buildSuccess": true, "errorSummary": null, "timestamp": "2026-06-04T09:34:23Z" },
   "targetDir": { "path": "...", "exists": true }
 }
 ```

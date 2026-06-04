@@ -1804,6 +1804,22 @@ const server = http.createServer(async (req, res) => {
 
         const reqs = await checkRequirements(minJavaVersion);
         if (!reqs.ok) return send(res, 500, { error: reqs.error });
+
+        // Clean any existing JAR files in target/ before building to avoid stale artifacts on failure
+        const targetDir = path.join(project.path, 'target');
+        if (fs.existsSync(targetDir)) {
+            try {
+                const files = fs.readdirSync(targetDir);
+                for (const file of files) {
+                    if (file.endsWith('.jar')) {
+                        fs.unlinkSync(path.join(targetDir, file));
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
         const skipTestsFlag = skipTests === 'true' || skipTests === '1' ? ' -DskipTests' : '';
         const mvnCmd = `mvn package${skipTestsFlag}`;
 
@@ -1820,7 +1836,6 @@ const server = http.createServer(async (req, res) => {
         }
 
         // Find the generated JAR
-        const targetDir = path.join(project.path, 'target');
         let jarFile = null;
         if (buildSuccess && fs.existsSync(targetDir)) {
             const files = fs.readdirSync(targetDir);
@@ -1839,6 +1854,15 @@ const server = http.createServer(async (req, res) => {
                 errorLines = [fallbackError || 'Build failed with non-zero exit code'];
             }
         }
+
+        // Update project lastBuild info in registry
+        project.lastBuild = {
+            buildSuccess,
+            errorSummary: errorLines.length > 0 ? errorLines : null,
+            timestamp: new Date().toISOString()
+        };
+        projects.set(projectName, project);
+        saveProjects();
 
         // Return 200 even on compilation failure so the orchestrator gets the JSON body containing errorSummary
         return send(res, 200, {
@@ -2027,6 +2051,7 @@ const server = http.createServer(async (req, res) => {
                 testJavaExists: fs.existsSync(srcTestJavaPath)
             },
             buildArtifact: jarInfo,
+            lastBuild: project.lastBuild || null,
             targetDir: {
                 path: targetDirAbsPath,
                 relativePath: targetDir,
