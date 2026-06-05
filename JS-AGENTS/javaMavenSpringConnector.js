@@ -7,24 +7,24 @@ const { exec, execSync } = require('child_process');
 const PORT = 3038;
 
 /* ================================================================
-   BASE DIR FROM CLI
+   BASE DIR INITIALIZATION
    ================================================================ */
 
 let BASE_DIR;
 
-if (process.argv[2]) {
-    const inputPath = path.resolve(process.argv[2]);
-    if (!fs.existsSync(inputPath)) {
-        fs.mkdirSync(inputPath, { recursive: true });
-    }
-    if (!fs.statSync(inputPath).isDirectory()) {
-        console.error('Invalid directory provided:', inputPath);
+// Check if javaProjects folder exists; create if it doesn't
+const javaProjectsDir = path.join(process.cwd(), 'javaProjects');
+if (!fs.existsSync(javaProjectsDir)) {
+    try {
+        fs.mkdirSync(javaProjectsDir, { recursive: true });
+        console.log('Created javaProjects directory at startup:', javaProjectsDir);
+    } catch (e) {
+        console.error('Failed to create javaProjects directory:', e.message);
         process.exit(1);
     }
-    BASE_DIR = inputPath;
-} else {
-    BASE_DIR = process.cwd();
 }
+
+BASE_DIR = javaProjectsDir;
 
 console.log('Java Maven Spring Connector Base Directory:', BASE_DIR);
 
@@ -40,7 +40,7 @@ console.log('Java Maven Spring Connector Base Directory:', BASE_DIR);
 const projects = new Map();
 
 /** Path to the persisted project registry */
-const PROJECTS_FILE = path.join(BASE_DIR, '.maven-projects.json');
+const PROJECTS_FILE = path.join(BASE_DIR, 'metadata.json');
 
 /** Save the current projects map to disk */
 function saveProjects() {
@@ -893,7 +893,7 @@ const server = http.createServer(async (req, res) => {
         const reqs = await checkRequirements();
         return send(res, 200, {
             status: 'UP',
-            version: '3.0',
+            version: '4.0',
             type: 'java-maven-spring-agent',
             baseDir: BASE_DIR,
             projectCount: projects.size,
