@@ -352,7 +352,7 @@ function findDependencyBlockRange(content, groupId, artifactId) {
     const aEsc = escapeRegex(artifactId);
     const gRegex = new RegExp(`<groupId>\\s*${gEsc}\\s*</groupId>`);
     const aRegex = new RegExp(`<artifactId>\\s*${aEsc}\\s*</artifactId>`);
-    
+
     while ((match = depRegex.exec(content)) !== null) {
         const block = match[1];
         if (gRegex.test(block) && aRegex.test(block)) {
@@ -373,7 +373,7 @@ function findPluginBlockRange(content, groupId, artifactId) {
     const aEsc = escapeRegex(artifactId);
     const gRegex = new RegExp(`<groupId>\\s*${gEsc}\\s*</groupId>`);
     const aRegex = new RegExp(`<artifactId>\\s*${aEsc}\\s*</artifactId>`);
-    
+
     while ((match = pluginRegex.exec(content)) !== null) {
         const block = match[1];
         const hasGroupId = gRegex.test(block) || (!block.includes('<groupId>') && groupId === 'org.apache.maven.plugins');
@@ -893,13 +893,94 @@ const server = http.createServer(async (req, res) => {
         const reqs = await checkRequirements();
         return send(res, 200, {
             status: 'UP',
-            version: '4.0',
+            version: '5.0',
             type: 'java-maven-spring-agent',
             baseDir: BASE_DIR,
             projectCount: projects.size,
             projects: [...projects.keys()],
             requirements: reqs
         });
+    }
+
+    /* ── GET /maven/class – Read a Java class source ──────────
+   Query: ?projectName=my-app&packageName=com.example.service&className=UserService
+   ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/class' && req.method === 'GET') {
+        const { projectName, packageName, className } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!packageName) return err400(res, 'Provide ?packageName=<package>');
+        if (!className) return err400(res, 'Provide ?className=<ClassName>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist.', projectName });
+        }
+
+        const project = projects.get(projectName);
+        const packagePath = packageName.replace(/\./g, path.sep);
+        const classFile = path.join(project.path, 'src', 'main', 'java', packagePath, `${className}.java`);
+
+        if (!fs.existsSync(classFile)) {
+            return err404(res, `Class '${className}.java' not found in package '${packageName}' of project '${projectName}'`);
+        }
+
+        try {
+            const code = fs.readFileSync(classFile, 'utf8');
+            const stat = fs.statSync(classFile);
+            return send(res, 200, {
+                message: 'Class read successfully',
+                projectName, packageName, className,
+                classFile,
+                code,
+                size: stat.size,
+                lastModified: stat.mtime.toISOString()
+            });
+        } catch (e) {
+            return err500(res, `Failed to read class file: ${e.message}`);
+        }
+    }
+
+    /* ── GET /maven/classes – List all Java source files ───────
+   Query: ?projectName=my-app&type=main|test|both (default: main)
+   ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/classes' && req.method === 'GET') {
+        const { projectName, type = 'main' } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist.', projectName });
+        }
+
+        const project = projects.get(projectName);
+
+        function walkJava(dir) {
+            const results = [];
+            if (!fs.existsSync(dir)) return results;
+            const walk = (current) => {
+                for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+                    const full = path.join(current, entry.name);
+                    if (entry.isDirectory()) {
+                        walk(full);
+                    } else if (entry.name.endsWith('.java')) {
+                        const rel = path.relative(dir, full);
+                        const packageName = path.dirname(rel).replace(/[\\/]/g, '.');
+                        const className = entry.name.replace(/\.java$/, '');
+                        const stat = fs.statSync(full);
+                        results.push({ className, packageName, relativePath: rel, absolutePath: path.resolve(full), size: stat.size });
+                    }
+                }
+            };
+            walk(dir);
+            return results;
+        }
+
+        const mainDir = path.join(project.path, 'src', 'main', 'java');
+        const testDir = path.join(project.path, 'src', 'test', 'java');
+
+        const response = { projectName, classes: {} };
+        if (type === 'main' || type === 'both') response.classes.main = walkJava(mainDir);
+        if (type === 'test' || type === 'both') response.classes.test = walkJava(testDir);
+        response.totalCount = Object.values(response.classes).reduce((s, arr) => s + arr.length, 0);
+
+        return send(res, 200, response);
     }
 
     /* ── GET /projects ────────────────────────────────────────── */
@@ -1068,7 +1149,7 @@ const server = http.createServer(async (req, res) => {
         // Validate Spring Boot configuration
         const normalizedDependencies = normalizeDependencies(dependencies);
         const hasParent = !!parent;
-        const hasSpringBootDeps = normalizedDependencies.some(dep => 
+        const hasSpringBootDeps = normalizedDependencies.some(dep =>
             (dep.groupId === 'org.springframework.boot' || dep.groupId.includes('springframework.boot')) &&
             !dep.artifactId.includes('starter-test')
         );
@@ -1079,7 +1160,7 @@ const server = http.createServer(async (req, res) => {
             if (!hasParent) {
                 validationWarnings.push('WARNING: Spring Boot dependencies detected without parent/BOM. Consider adding spring-boot-starter-parent as parent or using spring-boot-dependencies BOM.');
             }
-            const depsWithoutVersions = normalizedDependencies.filter(dep => 
+            const depsWithoutVersions = normalizedDependencies.filter(dep =>
                 (dep.groupId === 'org.springframework.boot' || dep.groupId.includes('springframework.boot')) &&
                 !dep.version
             );
@@ -1784,7 +1865,7 @@ const server = http.createServer(async (req, res) => {
 
         const project = projects.get(projectName);
         const pomPath = path.join(project.path, 'pom.xml');
-        
+
         let minJavaVersion = 11;
         if (fs.existsSync(pomPath)) {
             try {
