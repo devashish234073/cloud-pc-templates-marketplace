@@ -56,6 +56,19 @@
         "fileName": "angularConnector.txt"
     },
     {
+        "id": "http-request-connector",
+        "name": "HTTP Request Connector",
+        "currentVersion": "1.0",
+        "port": 3039,
+        "risky": false,
+        "description": "Use this when you need to call any HTTP or HTTPS endpoint directly — test a locally running Spring Boot or Node app, hit a REST API, verify a JSON response, poll a health check until a service is up, or run a sequence of API calls in order. Acts as a programmatic curl for the orchestrator. Supports single requests, sequential batches (up to 20), and parallel reachability probes (up to 10 URLs). Does not require a browser.",
+        "stepsToInstall": "No npm install needed. Start directly with: node httpRequestConnector.js",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/httpRequestConnector.js",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/httpRequestConnector-API.md",
+        "healthCheckUrl": "http://localhost:3039/health",
+        "fileName": "httpRequestConnector.txt"
+    },
+    {
         "id": "file-explorer",
         "name": "File Explorer",
         "currentVersion": "1.0",
