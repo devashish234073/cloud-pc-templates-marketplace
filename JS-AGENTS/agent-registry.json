@@ -69,6 +69,20 @@
         "fileName": "httpRequestConnector.txt"
     },
     {
+        "id": "cve-search-connector",
+        "name": "CVE Search Connector",
+        "currentVersion": "1.0",
+        "port": 3040,
+        "risky": false,
+        "risk": "This agent queries the public NVD (National Vulnerability Database) API which is read-only. No code execution or write operations are performed. All data is publicly available CVE information.",
+        "description": "Use this when you need to search for vulnerability information by CVE ID, check CVSS scores, find affected software versions, view CWE classifications, or get detailed vulnerability descriptions. Essential for security research, vulnerability assessment, and understanding software vulnerabilities.",
+        "stepsToInstall": "No npm install needed. Start directly with: node cveSearchConnector.js",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/cveSearchConnector.js",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/cveSearchConnector-API.md",
+        "healthCheckUrl": "http://localhost:3040/health",
+        "fileName": "cveSearchConnector.txt"
+    },
+    {
         "id": "file-explorer",
         "name": "File Explorer",
         "currentVersion": "1.0",
