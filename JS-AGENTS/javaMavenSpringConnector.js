@@ -270,14 +270,42 @@ async function checkRequirements(minJavaVersion = 11) {
    ================================================================ */
 
 function readBody(req) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
         req.on('end', () => {
-            try { resolve(body ? JSON.parse(body) : {}); }
-            catch { reject(new Error('Invalid JSON body')); }
+            if (!body) return resolve({});
+            // Normalise escaped quotes that result from LLM double-serialisation.
+            // When an orchestrator parses the LLM JSON string and re-serialises it,
+            // inner \" sequences can become \\\" — this strips one layer of escaping
+            // so the body is valid JSON again before parsing.
+            let normalised = body;
+            try {
+                JSON.parse(body);
+            } catch {
+                // Attempt to fix double-escaped quotes: \\\" -> \"
+                normalised = body.replace(/\\\\"/g, '\\"');
+                // If still broken, try unescaping the entire string as if it
+                // were a JSON-encoded string literal (LLM wrapped the whole body
+                // in an extra set of quotes)
+                try {
+                    JSON.parse(normalised);
+                } catch {
+                    try {
+                        const unwrapped = JSON.parse('"' + body.replace(/^"|"$/g, '') + '"');
+                        if (typeof unwrapped === 'string') normalised = unwrapped;
+                    } catch { /* fall through — parse below will produce the error */ }
+                }
+            }
+            try {
+                resolve(JSON.parse(normalised));
+            } catch {
+                // Resolve with a special sentinel so route handlers can return
+                // a proper 400 JSON response rather than an empty body
+                resolve({ __parseError: true, __rawBody: body.substring(0, 200) });
+            }
         });
-        req.on('error', reject);
+        req.on('error', () => resolve({ __parseError: true }));
     });
 }
 
@@ -893,7 +921,7 @@ const server = http.createServer(async (req, res) => {
         const reqs = await checkRequirements();
         return send(res, 200, {
             status: 'UP',
-            version: '5.0',
+            version: '5.1',
             type: 'java-maven-spring-agent',
             baseDir: BASE_DIR,
             projectCount: projects.size,
