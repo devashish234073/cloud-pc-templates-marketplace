@@ -2,13 +2,6 @@
 
 **Port:** `3038` | **Base URL:** `http://localhost:3038`
 
-**Startup:** `node javaMavenSpringConnector.js [basedir]`
-Scans `basedir` for existing Maven projects on startup. Defaults to `cwd`.
-
-All mutating endpoints verify Java (≥ 11 or project target version) and Maven are installed.
-
----
-
 ## Quick Reference
 
 | Method | Path | Purpose |
