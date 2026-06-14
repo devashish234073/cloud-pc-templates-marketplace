@@ -314,7 +314,9 @@ const server = http.createServer((req, res) => {
 
                     const transformed =
                         transformChatResponse(ollamaResp, parsedBody.model);
-
+                    if (!transformed.choices[0].message.content) {
+                        console.warn(`[EMPTY RESPONSE] Model: ${parsedBody.model} returned empty content`,'API key usage limit reached. Please retry after sometime.');
+                    }
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(transformed));
                 });
