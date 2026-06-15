@@ -218,9 +218,8 @@ function callOllamaChatStreaming(body, res) {
                 try {
                     const ollamaChunk = JSON.parse(line);
                     if (ollamaChunk?.error) {
-                        res.write(`data: ${JSON.stringify({ error: ollamaChunk.error })}\n\n`);
-                        res.end();
-                        return;
+                        console.error(`[OLLAMA ERROR] Model: ${body.model} returned error`, ollamaChunk.error);
+                        res.setHeader('X-Ollama-Error', ollamaChunk.error);
                     }
                     const content = ollamaChunk.message?.content || '';
                     const reasoning = ollamaChunk.message?.reasoning_content || '';
