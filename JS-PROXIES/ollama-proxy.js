@@ -217,7 +217,6 @@ function callOllamaChatStreaming(body, res) {
                 if (!line.trim()) return;
                 try {
                     const ollamaChunk = JSON.parse(line);
-                    console.log("ollamaChunk", ollamaChunk);
                     if (ollamaChunk?.error) {
                         console.error(`[OLLAMA ERROR] Model: ${body.model} returned error`, ollamaChunk.error);
                     }
@@ -246,7 +245,7 @@ function callOllamaChatStreaming(body, res) {
                         res.end();
                     }
                 } catch (err) {
-                    // Skip invalid JSON
+                    console.error(`[PARSING ERROR] Model: ${body.model} returned invalid JSON`, err);
                 }
             });
         });
