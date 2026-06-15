@@ -217,11 +217,11 @@ function callOllamaChatStreaming(body, res) {
                 if (!line.trim()) return;
                 try {
                     const ollamaChunk = JSON.parse(line);
+                    console.log("ollamaChunk", ollamaChunk);
                     if (ollamaChunk?.error) {
                         console.error(`[OLLAMA ERROR] Model: ${body.model} returned error`, ollamaChunk.error);
-                        res.setHeader('X-Ollama-Error', ollamaChunk.error);
                     }
-                    const content = ollamaChunk.message?.content || '';
+                    const content = ollamaChunk.message?.content || ollamaChunk?.error?ollamaChunk.error: '';
                     const reasoning = ollamaChunk.message?.reasoning_content || '';
 
                     if (content || reasoning) {
