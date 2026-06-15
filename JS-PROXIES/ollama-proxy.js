@@ -217,9 +217,14 @@ function callOllamaChatStreaming(body, res) {
                 if (!line.trim()) return;
                 try {
                     const ollamaChunk = JSON.parse(line);
+                    /*if (ollamaChunk?.error) {
+                        res.write(`data: ${JSON.stringify({ error: ollamaChunk.error })}\n\n`);
+                        res.end();
+                        return;
+                    }*/
                     const content = ollamaChunk.message?.content || '';
                     const reasoning = ollamaChunk.message?.reasoning_content || '';
-                    
+
                     if (content || reasoning) {
                         const hfChunk = {
                             id: id,
@@ -314,8 +319,14 @@ const server = http.createServer((req, res) => {
 
                     const transformed =
                         transformChatResponse(ollamaResp, parsedBody.model);
-                    if (!transformed.choices[0].message.content) {
-                        console.warn(`[EMPTY RESPONSE] Model: ${parsedBody.model} returned empty content`,'API key usage limit reached. Please retry after sometime.');
+                    /*if (ollamaChunk?.error) {
+                        res.setHeader('X-Ollama-Error', ollamaChunk.error);
+                        res.end();
+                        return;
+                    }*/
+                    if (ollamaResp.error && !transformed.choices[0].message.content) {
+                        res.setHeader('X-Ollama-Error', ollamaResp.error);
+                        console.warn(`[EMPTY RESPONSE] Model: ${parsedBody.model} returned empty content`, 'API key usage limit reached. Please retry after sometime.',ollamaResp.error);
                     }
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(transformed));
