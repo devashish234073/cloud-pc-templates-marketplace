@@ -64,7 +64,7 @@ function transformChatResponse(ollamaResp, originalModel) {
         "";
 
     const reasoning =
-        ollamaResp?.message?.reasoning_content ||
+        ollamaResp?.message?.reasoning_content || ollamaResp.message?.thinking ||
         ollamaResp?.choices?.[0]?.message?.reasoning_content ||
         "";
 
@@ -141,7 +141,8 @@ function callOllamaChat(body, callback) {
         messages: body.messages,
         temperature: body.temperature,
         top_p: body.top_p,
-        stream: false
+        stream: false,
+        think: false,
     });
 
     const options = {
@@ -182,7 +183,8 @@ function callOllamaChatStreaming(body, res) {
         messages: body.messages,
         temperature: body.temperature,
         top_p: body.top_p,
-        stream: true
+        stream: true,
+        think: false,
     });
 
     const options = {
@@ -205,6 +207,41 @@ function callOllamaChatStreaming(body, res) {
     const id = Date.now().toString();
     const created = Math.floor(Date.now() / 1000);
 
+    const FLUSH_THRESHOLD = 20;
+
+    let fullContent = '';
+    let fullThinking = '';
+    let pendingContent = '';   // unflushed chars since last write
+    let pendingThinking = '';
+    let usage = {};
+
+    function flush(finishReason) {
+        if (!pendingContent && !pendingThinking && !finishReason) return;
+
+        const chunk = {
+            id: id,
+            created: created,
+            object: 'chat.completion.chunk',
+            model: body.model,
+            choices: [{
+                index: 0,
+                delta: {
+                    role: 'assistant',
+                    content: pendingContent || undefined,
+                    reasoning_content: pendingThinking || undefined
+                },
+                finish_reason: finishReason || null
+            }]
+        };
+        if (finishReason && usage.total_tokens !== undefined) {
+            chunk.usage = usage;
+        }
+
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        pendingContent = '';
+        pendingThinking = '';
+    }
+
     const req = https.request(options, ollamaRes => {
         let buffer = '';
 
@@ -217,14 +254,11 @@ function callOllamaChatStreaming(body, res) {
                 if (!line.trim()) return;
                 try {
                     const ollamaChunk = JSON.parse(line);
-                    if (ollamaChunk?.error) {
-                        console.error(`[OLLAMA ERROR] Model: ${body.model} returned error`, ollamaChunk.error);
-                    }
-                    const content = ollamaChunk.message?.content || ollamaChunk?.error?ollamaChunk.error: '';
-                    const reasoning = ollamaChunk.message?.reasoning_content || '';
 
-                    if (content || reasoning) {
-                        const hfChunk = {
+                    if (ollamaChunk?.error) {
+                        console.error(`[OLLAMA ERROR] Model: ${body.model}`, ollamaChunk.error);
+
+                        const errorChunk = {
                             id: id,
                             created: created,
                             object: 'chat.completion.chunk',
@@ -233,24 +267,51 @@ function callOllamaChatStreaming(body, res) {
                                 index: 0,
                                 delta: {
                                     role: 'assistant',
-                                    content: content || undefined,
-                                    reasoning_content: reasoning || undefined
-                                }
+                                    content: `⚠️ Ollama error: ${ollamaChunk.error}`
+                                },
+                                finish_reason: 'stop'
                             }]
                         };
-                        res.write(`data: ${JSON.stringify(hfChunk)}\n\n`);
+
+                        res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
+                        res.write('data: [DONE]\n\n');
+                        res.end();
+                        return;
+                    }
+
+                    const newContent = ollamaChunk.message?.content || '';
+                    const newThinking = ollamaChunk.message?.thinking || '';
+
+                    fullContent += newContent;
+                    fullThinking += newThinking;
+                    pendingContent += newContent;
+                    pendingThinking += newThinking;
+
+                    // flush once unflushed buffer crosses the threshold
+                    if (pendingContent.length >= FLUSH_THRESHOLD || pendingThinking.length >= FLUSH_THRESHOLD) {
+                        flush(null);
                     }
 
                     if (ollamaChunk.done) {
+                        usage = {
+                            prompt_tokens: ollamaChunk.prompt_eval_count || 0,
+                            completion_tokens: ollamaChunk.eval_count || 0,
+                            total_tokens: (ollamaChunk.prompt_eval_count || 0) + (ollamaChunk.eval_count || 0)
+                        };
+
+                        flush(ollamaChunk.done_reason || 'stop');  // final flush, even if under threshold
+                        res.write('data: [DONE]\n\n');
                         res.end();
                     }
                 } catch (err) {
-                    console.error(`[PARSING ERROR] Model: ${body.model} returned invalid JSON`, err);
+                    console.error(`[PARSING ERROR] Model: ${body.model}`, err);
                 }
             });
         });
 
-        ollamaRes.on('end', () => res.end());
+        ollamaRes.on('end', () => {
+            if (!res.writableEnded) res.end();
+        });
     });
 
     req.on('error', err => {
@@ -325,7 +386,7 @@ const server = http.createServer((req, res) => {
                     }*/
                     if (ollamaResp.error && !transformed.choices[0].message.content) {
                         res.setHeader('X-Ollama-Error', ollamaResp.error);
-                        console.warn(`[EMPTY RESPONSE] Model: ${parsedBody.model} returned empty content`, 'API key usage limit reached. Please retry after sometime.',ollamaResp.error);
+                        console.warn(`[EMPTY RESPONSE] Model: ${parsedBody.model} returned empty content`, 'API key usage limit reached. Please retry after sometime.', ollamaResp.error);
                     }
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(transformed));
