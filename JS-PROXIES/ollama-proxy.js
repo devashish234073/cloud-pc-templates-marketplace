@@ -324,6 +324,44 @@ function callOllamaChatStreaming(body, res) {
 }
 
 /* =========================================================
+   CALL OLLAMA WEB SEARCH
+========================================================= */
+
+function callOllamaWebSearch(body, callback) {
+    const payload = JSON.stringify({
+        query: body.query,
+        max_results: body.max_results
+    });
+
+    const options = {
+        hostname: OLLAMA_HOST,
+        path: '/api/web_search',
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+        }
+    };
+
+    const req = https.request(options, res => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+            try {
+                callback(null, JSON.parse(data), res.statusCode);
+            } catch (err) {
+                callback(err);
+            }
+        });
+    });
+
+    req.on('error', err => callback(err));
+    req.write(payload);
+    req.end();
+}
+
+/* =========================================================
    MAIN SERVER
 ========================================================= */
 
@@ -351,6 +389,40 @@ const server = http.createServer((req, res) => {
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(transformed));
+        });
+
+        return;
+    }
+
+    /* -------- POST /v1/web_search or /api/web_search -------- */
+    if (req.method === 'POST' && (req.url === '/v1/web_search' || req.url === '/api/web_search')) {
+        let body = '';
+
+        req.on('data', chunk => body += chunk);
+
+        req.on('end', () => {
+            try {
+                const parsedBody = JSON.parse(body);
+
+                if (!parsedBody.query) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ error: "Missing query parameter 'query'" }));
+                }
+
+                callOllamaWebSearch(parsedBody, (err, ollamaResp, statusCode) => {
+                    if (err) {
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        return res.end(JSON.stringify({ error: err.message }));
+                    }
+
+                    res.writeHead(statusCode || 200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(ollamaResp));
+                });
+
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: "Invalid JSON body" }));
+            }
         });
 
         return;
@@ -402,6 +474,11 @@ const server = http.createServer((req, res) => {
     }
 
     /* -------- HEALTH -------- */
+    if (req.method === 'GET' && req.url === '/v1/web_search/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ status: "running" }));
+    }
+
     if (req.method === 'GET' && req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ status: "UP" }));
