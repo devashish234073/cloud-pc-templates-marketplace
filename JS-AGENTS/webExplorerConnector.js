@@ -151,7 +151,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({
             status: 'UP',
-            version: '1.0',
+            version: '2.0',
             type: 'agent'
         }));
     } else if (requestUrl.pathname === "/search" && req.method === "GET") {

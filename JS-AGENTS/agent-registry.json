@@ -69,6 +69,17 @@
         "fileName": "httpRequestConnector.txt"
     },
     {
+        "id": "web-explorer",
+        "name": "Web Explorer",
+        "currentVersion": "2.0",
+        "port": 3031,
+        "description": "Use this when you need to search the web, find external information, or look up documentation and answers online. Useful for gathering real-time information, finding best practices, and accessing external resources beyond local codebase.",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/webExplorerConnector.js",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/webExplorerConnector-API.md",
+        "healthCheckUrl": "http://localhost:3031/health",
+        "fileName": "webExplorerConnector.txt"
+    },
+    {
         "id": "cve-search-connector",
         "name": "CVE Search Connector",
         "currentVersion": "1.0",
@@ -114,17 +125,6 @@
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/gitExplorerConnector-API.md",
         "healthCheckUrl": "http://localhost:3033/health",
         "fileName": "gitExplorerConnector.txt"
-    },
-    {
-        "id": "web-explorer",
-        "name": "Web Explorer",
-        "currentVersion": "1.0",
-        "port": 3031,
-        "description": "Use this when you need to search the web, find external information, or look up documentation and answers online. Useful for gathering real-time information, finding best practices, and accessing external resources beyond local codebase.",
-        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/webExplorerConnector.js",
-        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/webExplorerConnector-API.md",
-        "healthCheckUrl": "http://localhost:3031/health",
-        "fileName": "webExplorerConnector.txt"
     },
     {
         "id": "selenium connector",
