@@ -71,3 +71,31 @@ Returns: {"count":2,"files":{"/abs/path1":{"content":"..."},"/abs/path2":{"conte
 GET /git/pull?repo=<folderName>
 Pull latest changes from remote for current branch.
 Returns: {"message":"Already up to date."}
+
+POST /git/writeFile
+Body: {"repo":"my-app","path":"src/utils.js","content":"module.exports = {};"}
+Create or overwrite a file. Parent directories are created automatically. Path must be relative to repo root.
+Returns: {"message":"File written: src/utils.js","filePath":"/abs/path/src/utils.js","size":22}
+
+POST /git/deleteFile
+Body: {"repo":"my-app","path":"src/old.js"}
+Delete a file or directory (recursive). Path must be relative to repo root.
+Returns: {"message":"Deleted: src/old.js","deletedPath":"/abs/path/src/old.js"}
+
+POST /git/createDir
+Body: {"repo":"my-app","path":"src/components/auth"}
+Create a directory (with parents). Path must be relative to repo root.
+Returns: {"message":"Directory created: src/components/auth","dirPath":"/abs/path/src/components/auth"}
+
+POST /git/renameFile
+Body: {"repo":"my-app","oldPath":"src/old.js","newPath":"src/new.js"}
+Move/rename a file using git mv (preserves history). Parent dirs for destination created automatically.
+Returns: {"message":"Renamed: src/old.js → src/new.js","oldPath":"/abs/old","newPath":"/abs/new"}
+
+GET /git/diff?repo=<folderName>&staged=true&branch=<ref1..ref2>&commit=<ref1..ref2>
+Show diffs. Default: unstaged changes. Use staged=true for staged changes, branch=main..dev for branch comparison, commit=abc..def for commit comparison. Only one mode at a time.
+Returns: {"diffType":"unstaged|staged|branch|commit","diff":"diff --git a/file ..."}
+
+GET /git/show?repo=<folderName>&commit=<commitHash>
+Show a specific commit's message and patch.
+Returns: {"commit":"a1b2c3","header":"commit a1b2c3\nAuthor: ...\nDate: ...\n\n    message","patch":"diff --git a/file ..."}

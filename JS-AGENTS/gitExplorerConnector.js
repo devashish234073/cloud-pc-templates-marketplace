@@ -224,7 +224,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/health') {
         return send(res, 200, {
             status: 'UP',
-            version: '2.0',
+            version: '3.0',
             type: 'git-explorer-agent',
             baseDir: BASE_DIR,
             repoCount: repos.length,
@@ -574,6 +574,163 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { return err500(res, e.message); }
     }
 
+    /* ── POST /writeFile  body: { repo, path, content } ──────── */
+    if (pathname === '/git/writeFile' && req.method === 'POST') {
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const { repo: repoName, path: filePath, content } = body;
+        if (!repoName || !filePath || content === undefined) return err400(res, 'Provide { repo, path, content }');
+
+        const repo = findRepo(repoName);
+        if (!repo) return err404(res, `Repo "${repoName}" not found`);
+
+        const absPath = path.join(repo.path, filePath);
+        if (!absPath.startsWith(repo.path + path.sep) && absPath !== repo.path) {
+            return err400(res, 'Path escapes repository boundary');
+        }
+
+        try {
+            fs.mkdirSync(path.dirname(absPath), { recursive: true });
+            fs.writeFileSync(absPath, content, 'utf8');
+            const stat = fs.statSync(absPath);
+            return send(res, 200, await withRepoMeta(repo.path, {
+                message: `File written: ${filePath}`,
+                filePath: absPath,
+                size: stat.size
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── POST /deleteFile  body: { repo, path } ─────────────── */
+    if (pathname === '/git/deleteFile' && req.method === 'POST') {
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const { repo: repoName, path: filePath } = body;
+        if (!repoName || !filePath) return err400(res, 'Provide { repo, path }');
+
+        const repo = findRepo(repoName);
+        if (!repo) return err404(res, `Repo "${repoName}" not found`);
+
+        const absPath = path.join(repo.path, filePath);
+        if (!absPath.startsWith(repo.path + path.sep)) {
+            return err400(res, 'Path escapes repository boundary');
+        }
+
+        if (!fs.existsSync(absPath)) return err404(res, `File not found: ${filePath}`);
+
+        try {
+            const stat = fs.statSync(absPath);
+            if (stat.isDirectory()) {
+                fs.rmSync(absPath, { recursive: true });
+            } else {
+                fs.unlinkSync(absPath);
+            }
+            return send(res, 200, await withRepoMeta(repo.path, {
+                message: `Deleted: ${filePath}`,
+                deletedPath: absPath
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── POST /createDir  body: { repo, path } ──────────────── */
+    if (pathname === '/git/createDir' && req.method === 'POST') {
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const { repo: repoName, path: dirPath } = body;
+        if (!repoName || !dirPath) return err400(res, 'Provide { repo, path }');
+
+        const repo = findRepo(repoName);
+        if (!repo) return err404(res, `Repo "${repoName}" not found`);
+
+        const absPath = path.join(repo.path, dirPath);
+        if (!absPath.startsWith(repo.path + path.sep)) {
+            return err400(res, 'Path escapes repository boundary');
+        }
+
+        try {
+            fs.mkdirSync(absPath, { recursive: true });
+            return send(res, 200, await withRepoMeta(repo.path, {
+                message: `Directory created: ${dirPath}`,
+                dirPath: absPath
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── POST /renameFile  body: { repo, oldPath, newPath } ──── */
+    if (pathname === '/git/renameFile' && req.method === 'POST') {
+        let body;
+        try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
+
+        const { repo: repoName, oldPath, newPath } = body;
+        if (!repoName || !oldPath || !newPath) return err400(res, 'Provide { repo, oldPath, newPath }');
+
+        const repo = findRepo(repoName);
+        if (!repo) return err404(res, `Repo "${repoName}" not found`);
+
+        const absOld = path.join(repo.path, oldPath);
+        const absNew = path.join(repo.path, newPath);
+        if (!absOld.startsWith(repo.path + path.sep) || !absNew.startsWith(repo.path + path.sep)) {
+            return err400(res, 'Path escapes repository boundary');
+        }
+
+        if (!fs.existsSync(absOld)) return err404(res, `Source not found: ${oldPath}`);
+
+        try {
+            fs.mkdirSync(path.dirname(absNew), { recursive: true });
+            await git(repo.path, `mv "${oldPath}" "${newPath}"`);
+            return send(res, 200, await withRepoMeta(repo.path, {
+                message: `Renamed: ${oldPath} → ${newPath}`,
+                oldPath: absOld,
+                newPath: absNew
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── GET /diff?repo=&staged=&branch=&commit= ────────────── */
+    if (pathname === '/git/diff') {
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        const repo = findRepo(query.repo);
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
+
+        try {
+            let args = 'diff';
+            if (query.staged === 'true') args += ' --staged';
+            else if (query.branch) args += ` ${query.branch}`;
+            else if (query.commit) args += ` ${query.commit}`;
+
+            const raw = await git(repo.path, args);
+            return send(res, 200, await withRepoMeta(repo.path, {
+                diffType: query.staged === 'true' ? 'staged' : query.branch ? 'branch' : query.commit ? 'commit' : 'unstaged',
+                diff: raw
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
+    /* ── GET /show?repo=&commit= ─────────────────────────────── */
+    if (pathname === '/git/show') {
+        if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
+        if (!query.commit) return err400(res, 'Provide ?commit=<commitHash>');
+        const repo = findRepo(query.repo);
+        if (!repo) return err404(res, `Repo "${query.repo}" not found`);
+
+        try {
+            const raw = await git(repo.path, `show "${query.commit}"`);
+            const lines = raw.split('\n');
+            const diffStart = lines.findIndex((l, i) => i > 3 && l.startsWith('diff --git'));
+            const header = diffStart > 0 ? lines.slice(0, diffStart).join('\n') : raw;
+            const patch = diffStart > 0 ? lines.slice(diffStart).join('\n') : '';
+
+            return send(res, 200, await withRepoMeta(repo.path, {
+                commit: query.commit,
+                header,
+                patch
+            }));
+        } catch (e) { return err500(res, e.message); }
+    }
+
     /* ── 404 ──────────────────────────────────────────────────── */
     send(res, 404, {
         error: 'Endpoint not found',
@@ -594,7 +751,13 @@ const server = http.createServer(async (req, res) => {
             'GET  /git/findByPartialName?repo=&name=',
             'GET  /git/search?repo=&text=',
             'POST /git/readFiles  ["/abs/path1", ...]',
-            'GET  /git/pull?repo='
+            'GET  /git/pull?repo=',
+            'POST /git/writeFile  { repo, path, content }',
+            'POST /git/deleteFile  { repo, path }',
+            'POST /git/createDir  { repo, path }',
+            'POST /git/renameFile  { repo, oldPath, newPath }',
+            'GET  /git/diff?repo=&staged=&branch=&commit=',
+            'GET  /git/show?repo=&commit='
         ]
     });
 });

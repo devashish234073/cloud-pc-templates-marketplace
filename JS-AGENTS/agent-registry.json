@@ -118,7 +118,7 @@
     {
         "id": "git-explorer",
         "name": "GIt Explorer",
-        "currentVersion": "2.0",
+        "currentVersion": "3.0",
         "port": 3033,
         "description": "Use this when you need to clone Git repositories, list and explore existing repositories, search source code within repositories, or manage version control operations. Ideal for discovering codebases, searching across projects, and performing git-related tasks.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/gitExplorerConnector.js",
@@ -139,5 +139,19 @@
         "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/rawSeleniumConnector-API.md",
         "healthCheckUrl": "http://localhost:3035/health",
         "fileName": "rawSeleniumConnector.zip"
+    },
+    {
+        "id": "nodejs-connector",
+        "name": "Node.js Connector",
+        "currentVersion": "1.0",
+        "port": 3041,
+        "risky": true,
+        "risk": "This agent can run arbitrary commands in project directories and install npm packages, so use it at your own risk as the LLM can send risky commands.",
+        "description": "Use this when you need to create Node.js projects (Express API or standalone), manage npm dependencies, create and edit source files, run and stop Node.js applications, or execute npm commands. Supports full project lifecycle from scaffolding to running. Essential for Node.js backend and utility development tasks.",
+        "stepsToInstall": "No npm install needed. Start directly with: node nodejsConnector.js",
+        "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/nodejsConnector.js",
+        "apiDocUrl": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/nodejsConnector-API.md",
+        "healthCheckUrl": "http://localhost:3041/health",
+        "fileName": "nodejsConnector.txt"
     }
 ]
