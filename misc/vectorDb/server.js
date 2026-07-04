@@ -340,6 +340,19 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, existed ? 200 : 404, { deleted: existed });
     }
 
+    // POST /query  { prompt, topK, metadataEquals }
+    // Convenience endpoint: embeds the prompt via Ollama then searches the DB.
+    if (req.method === 'POST' && parts[0] === 'query') {
+      const body = await readBody(req);
+      if (!body.prompt) return sendJson(res, 400, { error: 'prompt required' });
+      const vector = await embed(body.prompt);
+      const filter = body.metadataEquals
+        ? (meta) => Object.entries(body.metadataEquals).every(([k, v]) => meta[k] === v)
+        : null;
+      const results = db.search(vector, { topK: body.topK, filter });
+      return sendJson(res, 200, { results });
+    }
+
     // POST /save
     if (req.method === 'POST' && parts[0] === 'save') {
       return sendJson(res, 200, db.save());
