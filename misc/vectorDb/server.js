@@ -4,7 +4,7 @@ const http = require('http');
 const { URL } = require('url');
 const VectorDB = require('./lib/vectordb');
 
-const PORT = process.env.PORT || 3050;
+const PORT = process.env.PORT || 4302;
 const PERSIST_PATH = process.env.PERSIST_PATH || './data/vectors.json';
 const METRIC = process.env.METRIC || 'cosine'; // cosine | euclidean | dot
 
