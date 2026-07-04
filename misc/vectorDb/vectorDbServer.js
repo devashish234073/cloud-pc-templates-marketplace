@@ -1,10 +1,181 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const http = require('http');
 const https = require('https');
 const { execFile } = require('child_process');
 const { URL } = require('url');
-const VectorDB = require('./vectorDb');
+
+// =============================================================================
+// VectorDB — zero-dependency in-memory vector database with JSON persistence.
+// Brute-force search — O(n) per query. Fine up to a few hundred thousand
+// vectors on modest hardware; beyond that you'd want an approximate index
+// (HNSW/IVF).
+// =============================================================================
+
+class VectorDB {
+  /**
+   * @param {Object} options
+   * @param {number} [options.dimension] - Fixed vector dimension. Inferred from first insert if omitted.
+   * @param {'cosine'|'euclidean'|'dot'} [options.metric] - Similarity/distance metric.
+   * @param {string} [options.persistPath] - File path for save()/load(); auto-loads if it exists.
+   */
+  constructor(options = {}) {
+    this.dimension = options.dimension || null;
+    this.metric = options.metric || 'cosine';
+    this.vectors = new Map();   // id -> Float32Array
+    this.metadata = new Map();  // id -> object
+    this.norms = new Map();     // id -> precomputed L2 norm (cosine only)
+    this.persistPath = options.persistPath || null;
+
+    if (this.persistPath && fs.existsSync(this.persistPath)) {
+      this.load(this.persistPath);
+    }
+  }
+
+  _toFloat32(vec) {
+    return vec instanceof Float32Array ? vec : Float32Array.from(vec);
+  }
+
+  _norm(vec) {
+    let sum = 0;
+    for (let i = 0; i < vec.length; i++) sum += vec[i] * vec[i];
+    return Math.sqrt(sum);
+  }
+
+  _dot(a, b) {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) sum += a[i] * b[i];
+    return sum;
+  }
+
+  /** Insert or overwrite a vector. */
+  insert(id, vector, metadata = {}) {
+    const vec = this._toFloat32(vector);
+    if (this.dimension === null) this.dimension = vec.length;
+    if (vec.length !== this.dimension) {
+      throw new Error(`Dimension mismatch: expected ${this.dimension}, got ${vec.length}`);
+    }
+    this.vectors.set(id, vec);
+    this.metadata.set(id, metadata);
+    this.norms.set(id, this._norm(vec));
+    return { id, dimension: vec.length };
+  }
+
+  insertBatch(items) {
+    return items.map(({ id, vector, metadata }) => this.insert(id, vector, metadata));
+  }
+
+  delete(id) {
+    const existed = this.vectors.has(id);
+    this.vectors.delete(id);
+    this.metadata.delete(id);
+    this.norms.delete(id);
+    return existed;
+  }
+
+  get(id) {
+    if (!this.vectors.has(id)) return null;
+    return {
+      id,
+      vector: Array.from(this.vectors.get(id)),
+      metadata: this.metadata.get(id)
+    };
+  }
+
+  size() {
+    return this.vectors.size;
+  }
+
+  _score(queryVec, queryNorm, id) {
+    const vec = this.vectors.get(id);
+    switch (this.metric) {
+      case 'dot':
+        return this._dot(queryVec, vec);
+      case 'euclidean': {
+        let sum = 0;
+        for (let i = 0; i < vec.length; i++) {
+          const d = queryVec[i] - vec[i];
+          sum += d * d;
+        }
+        return -Math.sqrt(sum); // negate so "higher = closer" holds for all metrics
+      }
+      case 'cosine':
+      default: {
+        const denom = queryNorm * this.norms.get(id);
+        if (denom === 0) return 0;
+        return this._dot(queryVec, vec) / denom;
+      }
+    }
+  }
+
+  /**
+   * @param {number[]|Float32Array} queryVector
+   * @param {Object} [options]
+   * @param {number} [options.topK=10]
+   * @param {(metadata: Object) => boolean} [options.filter]
+   */
+  search(queryVector, options = {}) {
+    const topK = options.topK || 10;
+    const filter = options.filter || null;
+    const queryVec = this._toFloat32(queryVector);
+
+    if (this.dimension !== null && queryVec.length !== this.dimension) {
+      throw new Error(`Dimension mismatch: expected ${this.dimension}, got ${queryVec.length}`);
+    }
+
+    const queryNorm = this.metric === 'cosine' ? this._norm(queryVec) : 0;
+    const results = [];
+
+    for (const id of this.vectors.keys()) {
+      if (filter && !filter(this.metadata.get(id))) continue;
+      results.push({ id, score: this._score(queryVec, queryNorm, id) });
+    }
+
+    results.sort((a, b) => b.score - a.score);
+
+    return results.slice(0, topK).map(r => ({
+      id: r.id,
+      score: this.metric === 'euclidean' ? -r.score : r.score,
+      metadata: this.metadata.get(r.id)
+    }));
+  }
+
+  save(filepath = this.persistPath) {
+    if (!filepath) throw new Error('No persist path specified');
+    const data = {
+      dimension: this.dimension,
+      metric: this.metric,
+      entries: Array.from(this.vectors.keys()).map(id => ({
+        id,
+        vector: Array.from(this.vectors.get(id)),
+        metadata: this.metadata.get(id)
+      }))
+    };
+    fs.mkdirSync(path.dirname(filepath), { recursive: true });
+    fs.writeFileSync(filepath, JSON.stringify(data));
+    return { path: filepath, count: data.entries.length };
+  }
+
+  load(filepath = this.persistPath) {
+    if (!filepath || !fs.existsSync(filepath)) return { loaded: 0 };
+    const data = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+    this.dimension = data.dimension;
+    this.metric = data.metric || this.metric;
+    this.vectors.clear();
+    this.metadata.clear();
+    this.norms.clear();
+    for (const entry of data.entries) {
+      this.insert(entry.id, entry.vector, entry.metadata);
+    }
+    return { loaded: data.entries.length };
+  }
+}
+
+// =============================================================================
+// Config
+// =============================================================================
 
 const PORT = process.env.PORT || 4302;
 const PERSIST_PATH = process.env.PERSIST_PATH || './data/vectors.json';
@@ -17,10 +188,10 @@ const AGENT_REGISTRY_URL =
 
 const db = new VectorDB({ persistPath: PERSIST_PATH, metric: METRIC });
 
-// ---------------------------------------------------------------------------
+// =============================================================================
 // Ollama init — pulls the embed model once, sets a flag on success so that
 // every subsequent call skips straight through without re-running the pull.
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 let ollamaReady = false;
 let ollamaInitPromise = null; // deduplicate concurrent callers
@@ -50,9 +221,9 @@ function ollamaInit() {
   return ollamaInitPromise;
 }
 
-// ---------------------------------------------------------------------------
+// =============================================================================
 // Helpers
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 /** Fetch a URL and return the response body as a string. Works for http/https. */
 function fetchText(url) {
@@ -61,7 +232,6 @@ function fetchText(url) {
     const transport = parsed.protocol === 'https:' ? https : http;
     transport.get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        // Follow one redirect
         return fetchText(res.headers.location).then(resolve).catch(reject);
       }
       if (res.statusCode !== 200) {
@@ -115,20 +285,34 @@ async function embed(text) {
 
 /** Build a rich text blob from an agent registry entry for embedding. */
 function agentToText(agent) {
-  const parts = [
+  return [
     `Agent: ${agent.name || agent.id}`,
-    agent.description ? `Description: ${agent.description}` : '',
-    agent.risk ? `Risk: ${agent.risk}` : '',
-    agent.stepsToInstall ? `Installation: ${agent.stepsToInstall}` : '',
-    agent.port ? `Port: ${agent.port}` : '',
-    agent.currentVersion ? `Version: ${agent.currentVersion}` : ''
-  ];
-  return parts.filter(Boolean).join('\n');
+    agent.description    ? `Description: ${agent.description}`       : '',
+    agent.risk           ? `Risk: ${agent.risk}`                      : '',
+    agent.stepsToInstall ? `Installation: ${agent.stepsToInstall}`    : '',
+    agent.port           ? `Port: ${agent.port}`                      : '',
+    agent.currentVersion ? `Version: ${agent.currentVersion}`         : ''
+  ].filter(Boolean).join('\n');
 }
 
-// ---------------------------------------------------------------------------
+/** Split text into overlapping chunks. */
+function chunkText(text, chunkSize = 1500, overlap = 200) {
+  const chunks = [];
+  let start = 0;
+  while (start < text.length) {
+    chunks.push(text.slice(start, start + chunkSize));
+    start += chunkSize - overlap;
+    if (start + overlap >= text.length) break;
+  }
+  if (start < text.length && (chunks.length === 0 || chunks[chunks.length - 1] !== text.slice(start))) {
+    chunks.push(text.slice(start));
+  }
+  return chunks;
+}
+
+// =============================================================================
 // Startup seeding
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 async function seedFromRegistry() {
   console.log('[seed] Fetching agent registry from GitHub...');
@@ -184,7 +368,6 @@ async function seedFromRegistry() {
         continue;
       }
 
-      // Split large docs into chunks of ~1500 chars with 200-char overlap
       const chunks = chunkText(apiDocText, 1500, 200);
       console.log(`[seed]   Embedding ${chunks.length} API doc chunk(s) for "${agentId}"...`);
 
@@ -215,25 +398,9 @@ async function seedFromRegistry() {
   }
 }
 
-/** Split text into overlapping chunks. */
-function chunkText(text, chunkSize = 1500, overlap = 200) {
-  const chunks = [];
-  let start = 0;
-  while (start < text.length) {
-    chunks.push(text.slice(start, start + chunkSize));
-    start += chunkSize - overlap;
-    if (start + overlap >= text.length) break;
-  }
-  // Include any trailing content not yet captured
-  if (start < text.length && (chunks.length === 0 || chunks[chunks.length - 1] !== text.slice(start))) {
-    chunks.push(text.slice(start));
-  }
-  return chunks;
-}
-
-// ---------------------------------------------------------------------------
+// =============================================================================
 // HTTP helpers
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -267,15 +434,16 @@ function sendJson(res, status, obj) {
   res.end(payload);
 }
 
-// ---------------------------------------------------------------------------
+// =============================================================================
 // HTTP server
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const parts = url.pathname.split('/').filter(Boolean);
 
   try {
+    // CORS preflight — no init needed
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
@@ -298,18 +466,32 @@ const server = http.createServer(async (req, res) => {
         port: PORT,
         size: db.size(),
         dimension: db.dimension,
-        metric: db.metric
+        metric: db.metric,
+        ollamaReady
       });
     }
 
-    // POST /insert  { id, vector, metadata }
+    // POST /query  { prompt, topK?, metadataEquals? }
+    // Convenience: embeds the prompt via Ollama then searches in one shot.
+    if (req.method === 'POST' && parts[0] === 'query') {
+      const body = await readBody(req);
+      if (!body.prompt) return sendJson(res, 400, { error: 'prompt required' });
+      const vector = await embed(body.prompt);
+      const filter = body.metadataEquals
+        ? (meta) => Object.entries(body.metadataEquals).every(([k, v]) => meta[k] === v)
+        : null;
+      const results = db.search(vector, { topK: body.topK, filter });
+      return sendJson(res, 200, { results });
+    }
+
+    // POST /insert  { id, vector, metadata? }
     if (req.method === 'POST' && parts[0] === 'insert') {
       const body = await readBody(req);
       if (!body.id || !body.vector) return sendJson(res, 400, { error: 'id and vector required' });
       return sendJson(res, 201, db.insert(body.id, body.vector, body.metadata || {}));
     }
 
-    // POST /batch  { items: [{id, vector, metadata}] }
+    // POST /batch  { items: [{id, vector, metadata?}] }
     if (req.method === 'POST' && parts[0] === 'batch') {
       const body = await readBody(req);
       if (!Array.isArray(body.items)) return sendJson(res, 400, { error: 'items array required' });
@@ -317,7 +499,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 201, { inserted: results.length });
     }
 
-    // POST /search  { vector, topK, metadataEquals }
+    // POST /search  { vector, topK?, metadataEquals? }
     if (req.method === 'POST' && parts[0] === 'search') {
       const body = await readBody(req);
       if (!body.vector) return sendJson(res, 400, { error: 'vector required' });
@@ -340,19 +522,6 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, existed ? 200 : 404, { deleted: existed });
     }
 
-    // POST /query  { prompt, topK, metadataEquals }
-    // Convenience endpoint: embeds the prompt via Ollama then searches the DB.
-    if (req.method === 'POST' && parts[0] === 'query') {
-      const body = await readBody(req);
-      if (!body.prompt) return sendJson(res, 400, { error: 'prompt required' });
-      const vector = await embed(body.prompt);
-      const filter = body.metadataEquals
-        ? (meta) => Object.entries(body.metadataEquals).every(([k, v]) => meta[k] === v)
-        : null;
-      const results = db.search(vector, { topK: body.topK, filter });
-      return sendJson(res, 200, { results });
-    }
-
     // POST /save
     if (req.method === 'POST' && parts[0] === 'save') {
       return sendJson(res, 200, db.save());
@@ -364,16 +533,15 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
+// =============================================================================
 // Start
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 server.listen(PORT, async () => {
-  console.log(`VectorDB agent listening on port ${PORT} (metric=${METRIC})`);
+  console.log(`VectorDB server listening on port ${PORT} (metric=${METRIC})`);
   console.log(`Persisting to ${PERSIST_PATH}`);
   console.log(`Ollama host: ${OLLAMA_HOST}, embed model: ${EMBED_MODEL}`);
 
-  // Ensure the embed model is present before seeding
   try {
     await ollamaInit();
   } catch (err) {
@@ -381,7 +549,6 @@ server.listen(PORT, async () => {
     return;
   }
 
-  // Seed the DB from the remote agent registry on every cold start
   await seedFromRegistry();
 });
 
