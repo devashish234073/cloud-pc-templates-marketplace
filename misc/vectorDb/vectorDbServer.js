@@ -295,18 +295,137 @@ function agentToText(agent) {
   ].filter(Boolean).join('\n');
 }
 
-/** Split text into overlapping chunks. */
-function chunkText(text, chunkSize = 1500, overlap = 200) {
-  const chunks = [];
-  let start = 0;
-  while (start < text.length) {
-    chunks.push(text.slice(start, start + chunkSize));
-    start += chunkSize - overlap;
-    if (start + overlap >= text.length) break;
+/** Extract all method/path pairs from an API doc. */
+function extractPathsFromText(text) {
+  const paths = [];
+  const pathRegex = /\b(GET|POST|PUT|PATCH|DELETE)\s+(https?:\/\/[^\s`]+|\/[^\s`]+)/g;
+  let match;
+  while ((match = pathRegex.exec(text)) !== null) {
+    const method = match[1];
+    const path = match[2];
+    const key = `${method} ${path}`;
+    if (!paths.some(item => item.key === key)) {
+      paths.push({ key, method, path });
+    }
   }
-  if (start < text.length && (chunks.length === 0 || chunks[chunks.length - 1] !== text.slice(start))) {
-    chunks.push(text.slice(start));
+  return paths;
+}
+
+/** Split an API markdown document into logical sections using method/path lines. */
+function splitApiDocIntoSections(text) {
+  const normalized = (text || '').replace(/\r\n/g, '\n');
+  const lines = normalized.split('\n');
+  const sections = [];
+  const boundaryRegex = /^(###\s+`?(GET|POST|PUT|PATCH|DELETE)\s+(?:https?:\/\/[^\s`]+|\/[^\s`]+)`?|^(GET|POST|PUT|PATCH|DELETE)\s+(?:https?:\/\/[^\s`]+|\/[^\s`]+))/;
+
+  let currentLines = [];
+  let currentTitle = 'overview';
+  let inCodeBlock = false;
+
+  function pushSection(title, linesToPush) {
+    const textBody = linesToPush.join('\n').trim();
+    if (!textBody) return;
+    sections.push({ title, text: textBody });
   }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^```/.test(trimmed)) {
+      inCodeBlock = !inCodeBlock;
+      currentLines.push(line);
+      continue;
+    }
+
+    if (!inCodeBlock && boundaryRegex.test(trimmed)) {
+      if (currentLines.length > 0) {
+        pushSection(currentTitle, currentLines);
+      }
+      currentTitle = trimmed.replace(/^###\s+`?/, '').replace(/`$/, '').trim();
+      currentLines = [line];
+      continue;
+    }
+
+    currentLines.push(line);
+  }
+
+  if (currentLines.length > 0) {
+    pushSection(currentTitle, currentLines);
+  }
+
+  return sections;
+}
+
+/** Build a single overview chunk plus endpoint chunks for an API doc. */
+function buildApiDocChunks(agent, apiDocText) {
+  const sourceFile = (() => {
+    try {
+      return new URL(agent.apiDocUrl).pathname.split('/').pop() || agent.fileName || 'unknown-api-doc.md';
+    } catch {
+      return agent.fileName || 'unknown-api-doc.md';
+    }
+  })();
+
+  const sections = splitApiDocIntoSections(apiDocText);
+  const overviewSection = sections.shift() || { title: 'overview', text: apiDocText };
+  const paths = extractPathsFromText(apiDocText);
+
+  const overviewText = [
+    `Agent: ${agent.name || agent.id}`,
+    agent.id ? `Agent ID: ${agent.id}` : '',
+    agent.description ? `Description: ${agent.description}` : '',
+    agent.port ? `Port: ${agent.port}` : '',
+    agent.healthCheckUrl ? `Health check: ${agent.healthCheckUrl}` : '',
+    agent.currentVersion ? `Version: ${agent.currentVersion}` : '',
+    '',
+    'Available API paths:',
+    ...paths.map(({ method, path }) => `- ${method} ${path}`),
+    '',
+    'Document intro:',
+    overviewSection.text
+  ].filter(Boolean).join('\n').trim();
+
+  const chunks = [
+    {
+      kind: 'overview',
+      title: 'agent overview',
+      text: overviewText,
+      metadata: {
+        type: 'agent-apidoc',
+        agentId: agent.id || agent.name,
+        agentName: agent.name,
+        sourceFile,
+        chunkKind: 'overview',
+        paths: paths.map(({ method, path }) => `${method} ${path}`),
+        port: agent.port,
+        healthCheckUrl: agent.healthCheckUrl,
+        text: overviewText
+      }
+    }
+  ];
+
+  sections.forEach((section, index) => {
+    const sectionMatch = section.title.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(https?:\/\/[^\s`]+|\/[^\s`]+)/);
+    chunks.push({
+      kind: 'endpoint',
+      title: section.title,
+      text: section.text,
+      metadata: {
+        type: 'agent-apidoc',
+        agentId: agent.id || agent.name,
+        agentName: agent.name,
+        sourceFile,
+        chunkKind: 'endpoint',
+        endpointMethod: sectionMatch ? sectionMatch[1] : null,
+        endpointPath: sectionMatch ? sectionMatch[2] : null,
+        paths: paths.map(({ method, path }) => `${method} ${path}`),
+        port: agent.port,
+        healthCheckUrl: agent.healthCheckUrl,
+        sectionIndex: index,
+        text: section.text
+      }
+    });
+  });
+
   return chunks;
 }
 
@@ -368,19 +487,17 @@ async function seedFromRegistry() {
         continue;
       }
 
-      const chunks = chunkText(apiDocText, 1500, 200);
+      const chunks = buildApiDocChunks(agent, apiDocText);
       console.log(`[seed]   Embedding ${chunks.length} API doc chunk(s) for "${agentId}"...`);
 
       for (let i = 0; i < chunks.length; i++) {
         try {
-          const vector = await embed(chunks[i]);
-          db.insert(`agent:${agentId}:apidoc:${i}`, vector, {
-            type: 'agent-apidoc',
-            agentId,
-            name: agent.name,
+          const vector = await embed(chunks[i].text);
+          db.insert(`agent:${agentId}:apidoc:${chunks[i].kind}:${i}`, vector, {
+            ...chunks[i].metadata,
             chunkIndex: i,
             totalChunks: chunks.length,
-            text: chunks[i]
+            text: chunks[i].text
           });
         } catch (err) {
           console.error(`[seed]   ✗ Failed to embed API doc chunk ${i} for "${agentId}":`, err.message);
