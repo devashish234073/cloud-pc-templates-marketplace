@@ -58,7 +58,7 @@ Sample Response (component not found, 404):
 { "error": "Component 'my-header' not found", "searchedPath": "/project/src/app/my-header" }
 ---
 
-POST /component
+POST /component/create
 Creates an Angular component via `ng g c`, writes provided file contents, and auto-registers a route.
 Content-Type: application/json
 

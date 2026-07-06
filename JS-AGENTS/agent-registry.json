@@ -46,7 +46,7 @@
     {
         "id": "angular connector",
         "name": "Angular Connector",
-        "currentVersion": "3.0",
+        "currentVersion": "3.1",
         "port": 3034,
         "description": "Use this when you need to build Angular frontend applications, create or modify components (TypeScript, HTML, CSS), set up routing, or develop with Angular framework. Ideal for frontend UI development and Angular-specific development tasks.",
         "stepsToInstall": "To run first create an empty angular project in your machine by running 'ng new testApp'\nand then inside that testApp folder place this connector file and run it with\nnode <filename>",

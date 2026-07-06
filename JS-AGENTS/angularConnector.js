@@ -441,7 +441,7 @@ const server = http.createServer(async (req, res) => {
     if (parsedUrl.pathname === '/health' && req.method === 'GET') {
         return respond(200, {
             status: 'UP',
-            version: '3.0',
+            version: '3.1',
             type: 'agent',
             projectDir: PROJECT_DIR,
             routesFile: ROUTES_FILE || null,
@@ -559,8 +559,8 @@ const server = http.createServer(async (req, res) => {
         return respond(200, result);
     }
 
-    /* -------- 1. CREATE COMPONENT (POST /component) -------- */
-    if (parsedUrl.pathname === '/component' && req.method === 'POST') {
+    /* -------- 1. CREATE COMPONENT (POST /component/create) -------- */
+    if (parsedUrl.pathname === '/component/create' && req.method === 'POST') {
         let body;
         try {
             body = await readBody(req);
