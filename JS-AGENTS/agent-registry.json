@@ -107,7 +107,7 @@
     {
         "id": "tools-explorer",
         "name": "Tools Explorer",
-        "currentVersion": "1.0",
+        "currentVersion": "2.0",
         "port": 3032,
         "description": "Use this when you need to check if development tools are installed on the system or verify their versions (Java, Maven, Node, npm, Python, etc.). Helpful for environment setup verification and prerequisite checks before running build or deployment tasks.",
         "url": "https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/toolsExplorerConnector.js",
