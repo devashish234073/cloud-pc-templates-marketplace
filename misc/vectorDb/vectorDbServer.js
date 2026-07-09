@@ -4,8 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
-const { execFile } = require('child_process');
+const { execFile, execSync } = require('child_process');
 const { URL } = require('url');
+const os = require('os');
 
 // =============================================================================
 // VectorDB — zero-dependency in-memory vector database with JSON persistence.
@@ -185,6 +186,35 @@ const EMBED_MODEL = process.env.EMBED_MODEL || 'nomic-embed-text';
 
 const AGENT_REGISTRY_URL =
   'https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/JS-AGENTS/agent-registry.json';
+
+const REPO_CLONE_URL = 'https://github.com/devashish234073/cloud-pc-templates-marketplace.git';
+const REPO_DIR_NAME = 'cloud-pc-templates-marketplace';
+const RAW_GITHUB_PREFIXES = [
+  'https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/refs/heads/main/',
+  'https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/main/',
+];
+
+function ensureLocalRepo() {
+  const repoDir = path.join(os.homedir(), REPO_DIR_NAME);
+  if (fs.existsSync(path.join(repoDir, '.git'))) {
+    try { execSync('git pull', { cwd: repoDir, stdio: 'ignore' }); } catch (_) {}
+  } else {
+    execSync(`git clone ${REPO_CLONE_URL} ${repoDir}`, { stdio: 'ignore' });
+  }
+  return repoDir;
+}
+
+function readFromLocalRepo(relPath) {
+  const repoDir = ensureLocalRepo();
+  return fs.readFileSync(path.join(repoDir, relPath), 'utf8');
+}
+
+function urlToRepoRelPath(url) {
+  for (const prefix of RAW_GITHUB_PREFIXES) {
+    if (url.startsWith(prefix)) return url.slice(prefix.length);
+  }
+  return null;
+}
 
 const db = new VectorDB({ persistPath: PERSIST_PATH, metric: METRIC });
 
@@ -439,8 +469,13 @@ async function seedFromRegistry() {
   try {
     registryText = await fetchText(AGENT_REGISTRY_URL);
   } catch (err) {
-    console.error('[seed] Failed to fetch agent registry:', err.message);
-    return;
+    console.warn('[seed] Failed to fetch agent registry, falling back to local repo:', err.message);
+    try {
+      registryText = readFromLocalRepo('JS-AGENTS/agent-registry.json');
+    } catch (localErr) {
+      console.error('[seed] Local repo fallback also failed:', localErr.message);
+      return;
+    }
   }
 
   let agents;
@@ -483,8 +518,18 @@ async function seedFromRegistry() {
       try {
         apiDocText = await fetchText(agent.apiDocUrl);
       } catch (err) {
-        console.error(`[seed]   ✗ Failed to fetch API doc for "${agentId}":`, err.message);
-        continue;
+        console.warn(`[seed]   ✗ Failed to fetch API doc for "${agentId}", trying local repo:`, err.message);
+        const relPath = urlToRepoRelPath(agent.apiDocUrl);
+        if (!relPath) {
+          console.error(`[seed]   ✗ Cannot map apiDocUrl to repo path for "${agentId}"`);
+          continue;
+        }
+        try {
+          apiDocText = readFromLocalRepo(relPath);
+        } catch (localErr) {
+          console.error(`[seed]   ✗ Local repo fallback failed for "${agentId}":`, localErr.message);
+          continue;
+        }
       }
 
       const chunks = buildApiDocChunks(agent, apiDocText);
