@@ -1,5 +1,5 @@
 NODE.JS CONNECTOR API (http://localhost:3041)
-
+"agentId": "nodejs-connector"
 All endpoints scoped to a project use ?projectName=<name> where name is the project folder name shown in /node/projects.
 
 GET /health

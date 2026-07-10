@@ -1,5 +1,5 @@
 SQL CONNECTOR API (http://localhost:3037)
-
+"agentId": "mysql connector"
 All credentials and database name are hardcoded server-side. No credentials or database details are passed in any request.
 Database in use: cloud_pc_templates_agent
 

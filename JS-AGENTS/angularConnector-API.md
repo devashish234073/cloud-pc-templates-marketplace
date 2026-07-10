@@ -1,5 +1,5 @@
 ANGULAR DEV API (http://localhost:3034)
-
+"agentId": "angular connector"
 Wraps an Angular project with a REST API. On startup it resets routes to empty, clears app.component.html to <router-outlet />, then spawns `npm start` in the background. All endpoints are JSON in/out.
 
 Note when creating components make sure to include proper imports needed for code used e.g.

@@ -1,5 +1,5 @@
 # CVE Search Connector – API Reference
-
+"agentId": "cve-search-connector"
 **Port:** `3040` | **Base URL:** `http://localhost:3040`
 
 ## Quick Reference

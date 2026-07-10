@@ -1,4 +1,5 @@
 ToolsExplorer: This tool provides apis that can be called to get the version of various tools, like java,maven,node,npm,python,etc.
+"agentId": "tools-explorer"
 Health Check
 1. GET http://localhost:3032/health
 

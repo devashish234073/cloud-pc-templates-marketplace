@@ -1,5 +1,5 @@
 FILE EXPLORER API (http://localhost:3030)
-
+"agentId": "file-explorer"
 GET /health
 Returns: {"status":"UP","baseDir":"/path"}
 

@@ -1,5 +1,5 @@
 Raw Selenium Connector - Agent API Docs
-
+"agentId": "selenium connector"
 Base URL: http://localhost:3035
 
 ────────────────────────────────────────

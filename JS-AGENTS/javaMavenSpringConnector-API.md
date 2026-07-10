@@ -1,5 +1,5 @@
 # Java Maven Spring Connector – API Reference
-
+"agentId": "java-maven-spring connector"
 **Port:** `3038` | **Base URL:** `http://localhost:3038`
 
 ## Quick Reference

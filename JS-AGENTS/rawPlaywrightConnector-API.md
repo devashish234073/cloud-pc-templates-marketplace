@@ -1,5 +1,5 @@
 # Raw Playwright Connector - Agent API Docs
-
+"agentId": "playwright connector"
 Base URL: http://localhost:3036
 
 ────────────────────────────────────────

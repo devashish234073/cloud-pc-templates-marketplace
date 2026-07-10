@@ -1,5 +1,5 @@
 WEB SEARCH API (http://localhost:3031)
-
+"agentId": "web-explorer"
 GET /search?q=your_query_here
 Performs a web search using DuckDuckGo (HTML endpoint) and returns top 5 results.
 

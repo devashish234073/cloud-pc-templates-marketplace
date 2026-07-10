@@ -1,5 +1,5 @@
 # HTTP Request Connector – API Reference
-
+"agentId": "http-request-connector"
 **Port:** `3039` | **Base URL:** `http://localhost:3039`
 
 **Startup:** `node httpRequestConnector.js` (no `npm install` needed — zero dependencies)

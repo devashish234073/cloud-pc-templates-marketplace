@@ -1,5 +1,5 @@
 GIT EXPLORER API (http://localhost:3033)
-
+"agentId": "git-explorer"
 All repo-scoped responses include: repoName, remoteUrl, currentBranch.
 The "repo" param is always the local folder name (as shown in /git/repos under "folderName").
 
