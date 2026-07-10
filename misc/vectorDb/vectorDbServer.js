@@ -318,10 +318,8 @@ function agentToText(agent) {
   return [
     `Agent: ${agent.name || agent.id}`,
     agent.description    ? `Description: ${agent.description}`       : '',
-    agent.risk           ? `Risk: ${agent.risk}`                      : '',
-    agent.stepsToInstall ? `Installation: ${agent.stepsToInstall}`    : '',
-    agent.port           ? `Port: ${agent.port}`                      : '',
-    agent.currentVersion ? `Version: ${agent.currentVersion}`         : ''
+    agent.id           ? `"agentId": ${agent.id}`                      : '',
+    agent.port           ? `Port: ${agent.port}`                      : ''
   ].filter(Boolean).join('\n');
 }
 
