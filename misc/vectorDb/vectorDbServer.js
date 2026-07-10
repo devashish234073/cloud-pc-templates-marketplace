@@ -318,7 +318,7 @@ function agentToText(agent) {
   return [
     `Agent: ${agent.name || agent.id}`,
     agent.description    ? `Description: ${agent.description}`       : '',
-    agent.id           ? `"agentId": ${agent.id}`                      : '',
+    agent.id           ? `"agentId": "${agent.id}"`                      : '',
     agent.port           ? `Port: ${agent.port}`                      : ''
   ].filter(Boolean).join('\n');
 }
