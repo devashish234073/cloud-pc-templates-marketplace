@@ -80,3 +80,58 @@ Example Response:
   },
   "platform": "linux"
 }
+
+6. NPM Activity Report
+GET http://localhost:3032/npm-activity
+
+Query Parameters:
+- `date` (optional): `YYYY-MM-DD` to report activity for a specific day. Defaults to today.
+- `roots` (optional): comma-separated list of absolute root directories to scan for `node_modules` package activity. Defaults to the current user's home directory.
+
+Behavior:
+- Reads npm debug log entries from `~/.npm/_logs` for the requested date.
+- Scans `node_modules` trees under the given root directories for folders whose modification time falls within the requested date.
+- Checks the npx cache at `~/.npm/_npx` for package activity on that date.
+- Reads global npm packages from the npm prefix's `lib/node_modules` tree for packages touched on that date.
+
+Example Requests:
+GET http://localhost:3032/npm-activity
+GET http://localhost:3032/npm-activity?date=2026-08-04
+GET http://localhost:3032/npm-activity?date=2026-08-04&roots=/home/me,/opt/projects
+
+Example Response:
+{
+  "date": "2026-08-04",
+  "npmCommands": [
+    {
+      "file": "2026-08-04T09_12_33_123-debug-12345.log",
+      "timestamp": "09:12:33:123",
+      "command": "npm install express"
+    }
+  ],
+  "nodeModulesChanges": [
+    {
+      "project": "/home/me/projects/my-app",
+      "name": "express",
+      "version": "4.18.2",
+      "mtime": "2026-08-04T09:12:33.123Z",
+      "path": "/home/me/projects/my-app/node_modules/express"
+    }
+  ],
+  "npxCache": [
+    {
+      "name": "create-react-app",
+      "version": "5.0.1",
+      "mtime": "2026-08-04T10:00:00.000Z",
+      "path": "/home/me/.npm/_npx/12345/create-react-app"
+    }
+  ],
+  "globalPackages": [
+    {
+      "name": "npm",
+      "version": "10.3.0",
+      "mtime": "2026-08-04T11:00:00.000Z",
+      "path": "/usr/local/lib/node_modules/npm"
+    }
+  ]
+}
