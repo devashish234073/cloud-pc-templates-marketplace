@@ -129,6 +129,12 @@ function searchOllamaProxy(query) {
     });
 }
 
+/* ------------------ API HIT TRACKING ------------------ */
+
+const apiHitCounts = {
+    'GET /search': 0
+};
+
 /**
  * Create HTTP Server
  */
@@ -154,7 +160,11 @@ const server = http.createServer(async (req, res) => {
             version: '2.0',
             type: 'agent'
         }));
+    } else if (parsedUrl.pathname === '/insights') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ apiHitCounts }));
     } else if (requestUrl.pathname === "/search" && req.method === "GET") {
+        apiHitCounts['GET /search']++;
         const query = requestUrl.searchParams.get("q");
 
         if (!query) {

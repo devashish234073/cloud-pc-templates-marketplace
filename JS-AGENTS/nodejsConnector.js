@@ -417,6 +417,34 @@ node index.js
 }
 
 /* ================================================================
+   API HIT TRACKING
+   ================================================================ */
+
+const apiHitCounts = {
+    'GET /node/projects': 0,
+    'POST /node/create': 0,
+    'GET /node/rescan': 0,
+    'GET /node/project-details': 0,
+    'POST /node/dependency': 0,
+    'POST /node/dependency/remove': 0,
+    'GET /node/dependencies': 0,
+    'POST /node/file': 0,
+    'GET /node/file': 0,
+    'PUT /node/file': 0,
+    'PATCH /node/file': 0,
+    'GET /node/files': 0,
+    'GET /node/package-json': 0,
+    'PUT /node/script': 0,
+    'POST /node/run': 0,
+    'POST /node/stop': 0,
+    'GET /node/run-status': 0,
+    'POST /node/exec': 0,
+    'GET /node/env': 0,
+    'POST /node/env': 0,
+    'POST /node/npm-init-run': 0
+};
+
+/* ================================================================
    SERVER
    ================================================================ */
 
@@ -430,6 +458,11 @@ const server = http.createServer(async (req, res) => {
 
     const parsed = url.parse(req.url, true);
     const { pathname, query } = parsed;
+
+    /* ── GET /insights ─────────────────────────────────────────── */
+    if (pathname === '/insights' && req.method === 'GET') {
+        return send(res, 200, { apiHitCounts });
+    }
 
     /* ── GET /health ──────────────────────────────────────────── */
     if (pathname === '/health') {
@@ -447,6 +480,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/projects ───────────────────────────────────── */
     if (pathname === '/node/projects' && req.method === 'GET') {
+        apiHitCounts['GET /node/projects']++;
         const list = [];
         for (const [name, info] of projects) {
             const running = runningProcesses.has(name);
@@ -457,6 +491,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/create ────────────────────────────────────── */
     if (pathname === '/node/create' && req.method === 'POST') {
+        apiHitCounts['POST /node/create']++;
         const nodeInfo = await checkNode();
         if (!nodeInfo.ok) return send(res, 500, { error: nodeInfo.error });
 
@@ -508,6 +543,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/rescan ─────────────────────────────────────── */
     if (pathname === '/node/rescan' && req.method === 'GET') {
+        apiHitCounts['GET /node/rescan']++;
         projects.clear();
         scanExistingProjects();
         return send(res, 200, {
@@ -519,6 +555,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/project-details?projectName= ───────────────── */
     if (pathname === '/node/project-details' && req.method === 'GET') {
+        apiHitCounts['GET /node/project-details']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -553,6 +590,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/dependency?projectName= ───────────────────── */
     if (pathname === '/node/dependency' && req.method === 'POST') {
+        apiHitCounts['POST /node/dependency']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -586,6 +624,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/dependency/remove?projectName= ────────────── */
     if (pathname === '/node/dependency/remove' && req.method === 'POST') {
+        apiHitCounts['POST /node/dependency/remove']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -617,6 +656,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/dependencies?projectName= ──────────────────── */
     if (pathname === '/node/dependencies' && req.method === 'GET') {
+        apiHitCounts['GET /node/dependencies']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -635,6 +675,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/file?projectName=&filePath= ───────────────── */
     if (pathname === '/node/file' && req.method === 'POST') {
+        apiHitCounts['POST /node/file']++;
         const { projectName, filePath } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!filePath) return err400(res, 'Provide ?filePath=<relative/path>');
@@ -670,6 +711,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/file?projectName=&filePath= ────────────────── */
     if (pathname === '/node/file' && req.method === 'GET') {
+        apiHitCounts['GET /node/file']++;
         const { projectName, filePath } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!filePath) return err400(res, 'Provide ?filePath=<relative/path>');
@@ -705,6 +747,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── PUT /node/file?projectName=&filePath= ────────────────── */
     if (pathname === '/node/file' && req.method === 'PUT') {
+        apiHitCounts['PUT /node/file']++;
         const { projectName, filePath } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!filePath) return err400(res, 'Provide ?filePath=<relative/path>');
@@ -742,6 +785,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── PATCH /node/file?projectName=&filePath= ──────────────── */
     if (pathname === '/node/file' && req.method === 'PATCH') {
+        apiHitCounts['PATCH /node/file']++;
         const { projectName, filePath } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!filePath) return err400(res, 'Provide ?filePath=<relative/path>');
@@ -804,6 +848,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/files?projectName=  ─────────────────────────── */
     if (pathname === '/node/files' && req.method === 'GET') {
+        apiHitCounts['GET /node/files']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -830,6 +875,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/package-json?projectName=&raw=true ──────────── */
     if (pathname === '/node/package-json' && req.method === 'GET') {
+        apiHitCounts['GET /node/package-json']++;
         const { projectName, raw } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -853,6 +899,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── PUT /node/script?projectName= ────────────────────────── */
     if (pathname === '/node/script' && req.method === 'PUT') {
+        apiHitCounts['PUT /node/script']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -884,6 +931,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/run?projectName=&script= ──────────────────── */
     if (pathname === '/node/run' && req.method === 'POST') {
+        apiHitCounts['POST /node/run']++;
         const { projectName, script = 'start' } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -956,6 +1004,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/stop?projectName= ─────────────────────────── */
     if (pathname === '/node/stop' && req.method === 'POST') {
+        apiHitCounts['POST /node/stop']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
 
@@ -986,6 +1035,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/run-status?projectName= ────────────────────── */
     if (pathname === '/node/run-status' && req.method === 'GET') {
+        apiHitCounts['GET /node/run-status']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
 
@@ -1007,6 +1057,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/exec?projectName= ─────────────────────────── */
     if (pathname === '/node/exec' && req.method === 'POST') {
+        apiHitCounts['POST /node/exec']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -1043,6 +1094,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /node/env?projectName= ───────────────────────────── */
     if (pathname === '/node/env' && req.method === 'GET') {
+        apiHitCounts['GET /node/env']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -1073,6 +1125,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/env?projectName= ──────────────────────────── */
     if (pathname === '/node/env' && req.method === 'POST') {
+        apiHitCounts['POST /node/env']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);
@@ -1120,6 +1173,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /node/npm-init-run?projectName= ─────────────────── */
     if (pathname === '/node/npm-init-run' && req.method === 'POST') {
+        apiHitCounts['POST /node/npm-init-run']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) return err404(res, `Project '${projectName}' not found`);

@@ -271,6 +271,16 @@ async function getPythonVersion() {
     return runCommand('python --version || python3 --version');
 }
 
+/* ------------------ API HIT TRACKING ------------------ */
+
+const apiHitCounts = {
+    'GET /versions': 0,
+    'GET /version': 0,
+    'GET /npm-activity': 0,
+    'GET /timer': 0,
+    'GET /system-usage': 0
+};
+
 /* ------------------ SERVER ------------------ */
 
 const server = http.createServer(async (req, res) => {
@@ -293,8 +303,15 @@ const server = http.createServer(async (req, res) => {
         }));
     }
 
+    /* -------- INSIGHT -------- */
+    if (parsedUrl.pathname === '/insights') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ apiHitCounts }));
+    }
+
     /* -------- ALL VERSIONS -------- */
     if (parsedUrl.pathname === '/versions') {
+        apiHitCounts['GET /versions']++;
         res.writeHead(200, { 'Content-Type': 'application/json' });
 
         const [java, maven, node, npm, python] = await Promise.all([
@@ -316,6 +333,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- INDIVIDUAL TOOL -------- */
     if (parsedUrl.pathname === '/version') {
+        apiHitCounts['GET /version']++;
         const { tool } = parsedUrl.query;
 
         if (!tool) {
@@ -359,6 +377,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- NPM ACTIVITY REPORT -------- */
     if (parsedUrl.pathname === '/npm-activity') {
+        apiHitCounts['GET /npm-activity']++;
         const { date, roots } = parsedUrl.query;
         const parsedDate = parseDate(date);
 
@@ -376,6 +395,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- TIMER -------- */
     if (parsedUrl.pathname === '/timer') {
+        apiHitCounts['GET /timer']++;
         const { ref } = parsedUrl.query;
         const now = Date.now();
 
@@ -409,6 +429,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- SYSTEM USAGE -------- */
     if (parsedUrl.pathname === '/system-usage') {
+        apiHitCounts['GET /system-usage']++;
         const cpus = os.cpus();
         const cpuUsage = await new Promise((resolve) => {
             const start = cpus.map(c => ({ idle: c.times.idle, total: Object.values(c.times).reduce((a, b) => a + b, 0) }));

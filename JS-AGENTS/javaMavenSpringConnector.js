@@ -902,6 +902,40 @@ function execPromise(cmd, opts = {}) {
 }
 
 /* ================================================================
+   API HIT TRACKING
+   ================================================================ */
+
+const apiHitCounts = {
+    'GET /maven/class': 0,
+    'GET /maven/classes': 0,
+    'GET /maven/projects': 0,
+    'POST /maven/create': 0,
+    'POST /spring/create': 0,
+    'POST /spring/crud': 0,
+    'GET /maven/pom': 0,
+    'PUT /maven/properties': 0,
+    'PUT /maven/parent': 0,
+    'POST /maven/class': 0,
+    'PUT /maven/class': 0,
+    'PATCH /maven/class': 0,
+    'POST /maven/dependency': 0,
+    'POST /maven/dependencies': 0,
+    'GET /maven/plugins': 0,
+    'POST /maven/plugin': 0,
+    'GET /maven/dependencies': 0,
+    'GET /maven/build': 0,
+    'GET /maven/jar': 0,
+    'GET /maven/rescan': 0,
+    'GET /maven/artifact': 0,
+    'GET /maven/project-details': 0,
+    'POST /maven/resource/file': 0,
+    'GET /maven/resource/file': 0,
+    'PUT /maven/resource/file': 0,
+    'PATCH /maven/resource/file': 0,
+    'GET /maven/resources': 0
+};
+
+/* ================================================================
    SERVER
    ================================================================ */
 
@@ -915,6 +949,11 @@ const server = http.createServer(async (req, res) => {
 
     const parsed = url.parse(req.url, true);
     const { pathname, query } = parsed;
+
+    /* ── GET /insights ──────────────────────────────────────────── */
+    if (pathname === '/insights' && req.method === 'GET') {
+        return send(res, 200, { apiHitCounts });
+    }
 
     /* ── GET /health ──────────────────────────────────────────── */
     if (pathname === '/health') {
@@ -934,6 +973,7 @@ const server = http.createServer(async (req, res) => {
    Query: ?projectName=my-app&packageName=com.example.service&className=UserService
    ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/class' && req.method === 'GET') {
+        apiHitCounts['GET /maven/class']++;
         const { projectName, packageName, className } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!packageName) return err400(res, 'Provide ?packageName=<package>');
@@ -971,6 +1011,7 @@ const server = http.createServer(async (req, res) => {
    Query: ?projectName=my-app&type=main|test|both (default: main)
    ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/classes' && req.method === 'GET') {
+        apiHitCounts['GET /maven/classes']++;
         const { projectName, type = 'main' } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) {
@@ -1013,6 +1054,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /projects ────────────────────────────────────────── */
     if (pathname === '/maven/projects' && req.method === 'GET') {
+        apiHitCounts['GET /maven/projects']++;
         const list = [];
         for (const [name, info] of projects) {
             list.push({ name, ...info });
@@ -1032,6 +1074,7 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/create' && req.method === 'POST') {
+        apiHitCounts['POST /maven/create']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -1133,6 +1176,7 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/spring/create' && req.method === 'POST') {
+        apiHitCounts['POST /spring/create']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -1290,6 +1334,7 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/spring/crud' && req.method === 'POST') {
+        apiHitCounts['POST /spring/crud']++;
         const reqs = await checkRequirements();
         if (!reqs.ok) return send(res, 500, { error: reqs.error });
 
@@ -1373,6 +1418,7 @@ const server = http.createServer(async (req, res) => {
        Query: ?projectName=my-app&raw=true
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/pom' && req.method === 'GET') {
+        apiHitCounts['GET /maven/pom']++;
         const { projectName, raw } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) {
@@ -1400,6 +1446,7 @@ const server = http.createServer(async (req, res) => {
        Body: { properties: { "java.version": "17" } }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/properties' && req.method === 'PUT') {
+        apiHitCounts['PUT /maven/properties']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) {
@@ -1434,6 +1481,7 @@ const server = http.createServer(async (req, res) => {
        Body: { groupId, artifactId, version, relativePath? }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/parent' && req.method === 'PUT') {
+        apiHitCounts['PUT /maven/parent']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) {
@@ -1468,6 +1516,7 @@ const server = http.createServer(async (req, res) => {
        Body: { code: "package com.example.service;\n\npublic class UserService { ... }" }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/class' && req.method === 'POST') {
+        apiHitCounts['POST /maven/class']++;
         // Requirement check
         const reqs = await checkRequirements();
         if (!reqs.ok) return send(res, 500, { error: reqs.error });
@@ -1522,6 +1571,7 @@ const server = http.createServer(async (req, res) => {
        Body: { code: "..." }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/class' && req.method === 'PUT') {
+        apiHitCounts['PUT /maven/class']++;
         // Requirement check
         const reqs = await checkRequirements();
         if (!reqs.ok) return send(res, 500, { error: reqs.error });
@@ -1580,6 +1630,7 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/class' && req.method === 'PATCH') {
+        apiHitCounts['PATCH /maven/class']++;
         const reqs = await checkRequirements();
         if (!reqs.ok) return send(res, 500, { error: reqs.error });
 
@@ -1668,6 +1719,7 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/dependency' && req.method === 'POST') {
+        apiHitCounts['POST /maven/dependency']++;
         // Requirement check
         const reqs = await checkRequirements();
         if (!reqs.ok) return send(res, 500, { error: reqs.error });
@@ -1728,6 +1780,7 @@ const server = http.createServer(async (req, res) => {
        Body: { dependencies: [{ groupId, artifactId, version?, scope?, exclusions? }] }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/dependencies' && req.method === 'POST') {
+        apiHitCounts['POST /maven/dependencies']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) {
@@ -1767,6 +1820,7 @@ const server = http.createServer(async (req, res) => {
        Query: ?projectName=my-app
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/plugins' && req.method === 'GET') {
+        apiHitCounts['GET /maven/plugins']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) {
@@ -1788,6 +1842,7 @@ const server = http.createServer(async (req, res) => {
        Body: { groupId?, artifactId, version?, configuration?, executions?, rawXml? }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/plugin' && req.method === 'POST') {
+        apiHitCounts['POST /maven/plugin']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!projects.has(projectName)) {
@@ -1821,6 +1876,7 @@ const server = http.createServer(async (req, res) => {
        Returns all dependencies with their current versions from pom.xml.
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/dependencies' && req.method === 'GET') {
+        apiHitCounts['GET /maven/dependencies']++;
         // Requirement check
         const reqs = await checkRequirements();
         if (!reqs.ok) return send(res, 500, { error: reqs.error });
@@ -1884,6 +1940,7 @@ const server = http.createServer(async (req, res) => {
        Query: ?projectName=my-app&skipTests=true
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/build' && req.method === 'GET') {
+        apiHitCounts['GET /maven/build']++;
         const { projectName, skipTests } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
 
@@ -1989,6 +2046,7 @@ const server = http.createServer(async (req, res) => {
        Sends the JAR file as a binary download.
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/jar' && req.method === 'GET') {
+        apiHitCounts['GET /maven/jar']++;
         // Requirement check
         const reqs = await checkRequirements();
         if (!reqs.ok) return send(res, 500, { error: reqs.error });
@@ -2021,6 +2079,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /maven/rescan ────────────────────────────────────── */
     if (pathname === '/maven/rescan' && req.method === 'GET') {
+        apiHitCounts['GET /maven/rescan']++;
         projects.clear();
         scanExistingProjects(); // also saves to registry file
         return send(res, 200, {
@@ -2036,6 +2095,7 @@ const server = http.createServer(async (req, res) => {
        This is useful for "share jar location" use cases.
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/artifact' && req.method === 'GET') {
+        apiHitCounts['GET /maven/artifact']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
 
@@ -2082,6 +2142,7 @@ const server = http.createServer(async (req, res) => {
        Returns all details: jar file path, src file paths, pom info, etc.
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/project-details' && req.method === 'GET') {
+        apiHitCounts['GET /maven/project-details']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
 
@@ -2174,6 +2235,7 @@ const server = http.createServer(async (req, res) => {
        Body: { content: "..." }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/resource/file' && req.method === 'POST') {
+        apiHitCounts['POST /maven/resource/file']++;
         const { projectName, filePath: queryFilePath } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!queryFilePath) return err400(res, 'Provide ?filePath=<relative/path/to/file>');
@@ -2222,6 +2284,7 @@ const server = http.createServer(async (req, res) => {
        Query: ?projectName=my-app&filePath=application.properties
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/resource/file' && req.method === 'GET') {
+        apiHitCounts['GET /maven/resource/file']++;
         const { projectName, filePath: queryFilePath } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!queryFilePath) return err400(res, 'Provide ?filePath=<relative/path/to/file>');
@@ -2266,6 +2329,7 @@ const server = http.createServer(async (req, res) => {
        Body: { content: "..." }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/resource/file' && req.method === 'PUT') {
+        apiHitCounts['PUT /maven/resource/file']++;
         const { projectName, filePath: queryFilePath } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!queryFilePath) return err400(res, 'Provide ?filePath=<relative/path/to/file>');
@@ -2323,6 +2387,7 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/resource/file' && req.method === 'PATCH') {
+        apiHitCounts['PATCH /maven/resource/file']++;
         const { projectName, filePath: queryFilePath } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
         if (!queryFilePath) return err400(res, 'Provide ?filePath=<relative/path/to/file>');
@@ -2399,6 +2464,7 @@ const server = http.createServer(async (req, res) => {
        Query: ?projectName=my-app
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/maven/resources' && req.method === 'GET') {
+        apiHitCounts['GET /maven/resources']++;
         const { projectName } = query;
         if (!projectName) return err400(res, 'Provide ?projectName=<name>');
 

@@ -316,6 +316,19 @@ function parseCVEData(cveData, cveId) {
 }
 
 /* ================================================================
+   API HIT TRACKING
+   ================================================================ */
+
+const apiHitCounts = {
+    'GET /cve/search': 0,
+    'POST /cve/search': 0,
+    'GET /cve/recent': 0,
+    'GET /cve/status': 0,
+    'GET /cve/clear-cache': 0,
+    'GET /': 0
+};
+
+/* ================================================================
    SERVER
    ================================================================ */
 
@@ -350,10 +363,16 @@ const server = http.createServer(async (req, res) => {
         });
     }
 
+    /* ── GET /insights ──────────────────────────────────────────── */
+    if (pathname === '/insights') {
+        return sendJson(res, 200, { apiHitCounts });
+    }
+
     /* ── GET /cve/search?cveId=CVE-2026-41711 ──────────────────
        Search for a specific CVE by ID
     ─────────────────────────────────────────────────────────── */
     if (pathname === '/cve/search' && req.method === 'GET') {
+        apiHitCounts['GET /cve/search']++;
         const { cveId } = query;
 
         if (!cveId) {
@@ -419,6 +438,7 @@ const server = http.createServer(async (req, res) => {
        Search for CVE with JSON body: { "cveId": "CVE-2026-41711" }
     ─────────────────────────────────────────────────────────── */
     if (pathname === '/cve/search' && req.method === 'POST') {
+        apiHitCounts['POST /cve/search']++;
         let body = '';
 
         req.on('data', chunk => {
@@ -482,6 +502,7 @@ const server = http.createServer(async (req, res) => {
        Get recent CVEs (from cache only, doesn't call NVD)
     ─────────────────────────────────────────────────────────── */
     if (pathname === '/cve/recent' && req.method === 'GET') {
+        apiHitCounts['GET /cve/recent']++;
         const { limit = 10 } = query;
         const recent = [];
 
@@ -512,6 +533,7 @@ const server = http.createServer(async (req, res) => {
        Get agent status and stats
     ─────────────────────────────────────────────────────────── */
     if (pathname === '/cve/status' && req.method === 'GET') {
+        apiHitCounts['GET /cve/status']++;
         return sendJson(res, 200, {
             status: 'operational',
             type: 'cve-search-agent',
@@ -539,6 +561,7 @@ const server = http.createServer(async (req, res) => {
        Clear the CVE cache
     ─────────────────────────────────────────────────────────── */
     if (pathname === '/cve/clear-cache' && req.method === 'GET') {
+        apiHitCounts['GET /cve/clear-cache']++;
         const size = cveCache.size;
         cveCache.clear();
         return sendJson(res, 200, {
@@ -552,6 +575,7 @@ const server = http.createServer(async (req, res) => {
        Root endpoint with available endpoints
     ─────────────────────────────────────────────────────────── */
     if (pathname === '/') {
+        apiHitCounts['GET /']++;
         return sendJson(res, 200, {
             name: 'CVE Vulnerability Search Agent',
             version: '1.0',

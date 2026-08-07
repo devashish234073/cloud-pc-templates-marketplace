@@ -154,6 +154,14 @@ function findTextInFiles(dir, searchText, excludeFolders, results = []) {
     return results;
 }
 
+/* ------------------ API HIT TRACKING ------------------ */
+
+const apiHitCounts = {
+    'GET /findFile': 0,
+    'GET /searchText': 0,
+    'GET /readFile': 0
+};
+
 /* ------------------ SERVER ------------------ */
 
 const server = http.createServer((req, res) => {
@@ -173,8 +181,15 @@ const server = http.createServer((req, res) => {
         }));
     }
 
+    /* -------- INSIGHT -------- */
+    if (parsedUrl.pathname === '/insights') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ apiHitCounts }));
+    }
+
     /* -------- FIND FILE -------- */
     if (parsedUrl.pathname === '/findFile') {
+        apiHitCounts['GET /findFile']++;
         const { type, name, excludeFolder } = parsedUrl.query;
 
         let excludeFolders = [];
@@ -206,6 +221,7 @@ const server = http.createServer((req, res) => {
 
     /* -------- SEARCH TEXT -------- */
     if (parsedUrl.pathname === '/searchText') {
+        apiHitCounts['GET /searchText']++;
         const { text, excludeFolder } = parsedUrl.query;
 
         let excludeFolders = [];
@@ -240,6 +256,7 @@ const server = http.createServer((req, res) => {
 
     /* -------- READ FILE (NEW) -------- */
     if (parsedUrl.pathname === '/readFile') {
+        apiHitCounts['GET /readFile']++;
         const { path: filePath } = parsedUrl.query;
 
         res.writeHead(200, { 'Content-Type': 'application/json' });

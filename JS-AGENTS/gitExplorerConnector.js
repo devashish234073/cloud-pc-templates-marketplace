@@ -206,6 +206,35 @@ function err404(res, msg) { send(res, 404, { error: msg }); }
 function err500(res, msg) { send(res, 500, { error: msg }); }
 
 /* ================================================================
+   API HIT TRACKING
+   ================================================================ */
+
+const apiHitCounts = {
+    'GET /git/repos': 0,
+    'GET /git/rescan': 0,
+    'GET /git/clone': 0,
+    'GET /git/branches': 0,
+    'POST /git/switch': 0,
+    'GET /git/tree': 0,
+    'GET /git/file': 0,
+    'GET /git/filesByExtension': 0,
+    'GET /git/remoteUrl': 0,
+    'GET /git/log': 0,
+    'GET /git/status': 0,
+    'GET /git/findByName': 0,
+    'GET /git/findByPartialName': 0,
+    'GET /git/search': 0,
+    'POST /git/readFiles': 0,
+    'GET /git/pull': 0,
+    'POST /git/writeFile': 0,
+    'POST /git/deleteFile': 0,
+    'POST /git/createDir': 0,
+    'POST /git/renameFile': 0,
+    'GET /git/diff': 0,
+    'GET /git/show': 0
+};
+
+/* ================================================================
    SERVER
    ================================================================ */
 
@@ -219,6 +248,11 @@ const server = http.createServer(async (req, res) => {
 
     const parsed = url.parse(req.url, true);
     const { pathname, query } = parsed;
+
+    /* ── GET /insights ─────────────────────────────────────────── */
+    if (pathname === '/insights') {
+        return send(res, 200, { apiHitCounts });
+    }
 
     /* ── GET /health ──────────────────────────────────────────── */
     if (pathname === '/health') {
@@ -234,6 +268,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /repos ───────────────────────────────────────────── */
     if (pathname === '/git/repos') {
+        apiHitCounts['GET /git/repos']++;
         const list = await Promise.all(repos.map(async r => {
             const { remoteUrl, repoName } = await getRemoteMeta(r.path);
             let currentBranch = null;
@@ -245,12 +280,14 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /rescan ──────────────────────────────────────────── */
     if (pathname === '/git/rescan') {
+        apiHitCounts['GET /git/rescan']++;
         scanRepos();
         return send(res, 200, { message: 'Rescanned', repoCount: repos.length, repos: repos.map(r => r.name) });
     }
 
     /* ── GET /clone?url=<gitUrl> ──────────────────────────────── */
     if (pathname === '/git/clone') {
+        apiHitCounts['GET /git/clone']++;
         const repoUrl = query.url;
         if (!repoUrl) return err400(res, 'Provide ?url=<git-repo-url>');
 
@@ -273,6 +310,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /branches?repo=<name> ───────────────────────────── */
     if (pathname === '/git/branches') {
+        apiHitCounts['GET /git/branches']++;
         const repo = findRepo(query.repo);
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         if (!repo) return err404(res, `Repo "${query.repo}" not found`);
@@ -297,6 +335,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /switch  body: { repo, branch } ────────────────── */
     if (pathname === '/git/switch' && req.method === 'POST') {
+        apiHitCounts['POST /git/switch']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -318,6 +357,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /tree?repo=<name> ───────────────────────────────── */
     if (pathname === '/git/tree') {
+        apiHitCounts['GET /git/tree']++;
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         const repo = findRepo(query.repo);
         if (!repo) return err404(res, `Repo "${query.repo}" not found`);
@@ -330,6 +370,7 @@ const server = http.createServer(async (req, res) => {
     /*   Returns full content of a single file.
          path can be absolute OR relative to BASE_DIR.           */
     if (pathname === '/git/file') {
+        apiHitCounts['GET /git/file']++;
         const filePath = query.path;
         if (!filePath) return err400(res, 'Provide ?path=<filePath>');
 
@@ -359,6 +400,7 @@ const server = http.createServer(async (req, res) => {
     /*   Returns full paths of all files matching given extension(s).
          ext can be comma-separated: js,ts,jsx                    */
     if (pathname === '/git/filesByExtension') {
+        apiHitCounts['GET /git/filesByExtension']++;
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         if (!query.ext)  return err400(res, 'Provide ?ext=<extension> (e.g. js or js,ts,jsx)');
 
@@ -382,6 +424,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /remoteUrl?repo=<name> ──────────────────────────── */
     if (pathname === '/git/remoteUrl') {
+        apiHitCounts['GET /git/remoteUrl']++;
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         const repo = findRepo(query.repo);
         if (!repo) return err404(res, `Repo "${query.repo}" not found`);
@@ -405,6 +448,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /log?repo=<name>&branch=<branch>&limit=<n> ──────── */
     if (pathname === '/git/log') {
+        apiHitCounts['GET /git/log']++;
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         const repo = findRepo(query.repo);
         if (!repo) return err404(res, `Repo "${query.repo}" not found`);
@@ -425,6 +469,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /status?repo=<name> ─────────────────────────────── */
     if (pathname === '/git/status') {
+        apiHitCounts['GET /git/status']++;
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         const repo = findRepo(query.repo);
         if (!repo) return err404(res, `Repo "${query.repo}" not found`);
@@ -447,6 +492,7 @@ const server = http.createServer(async (req, res) => {
     /* ── GET /findByName?repo=<name>&name=<fileName> ─────────── */
     /*   Exact file name match across one repo (or all if no repo given) */
     if (pathname === '/git/findByName') {
+        apiHitCounts['GET /git/findByName']++;
         const name = query.name;
         if (!name) return err400(res, 'Provide ?name=<fileName>');
 
@@ -469,6 +515,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /findByPartialName?repo=<name>&name=<partial> ───── */
     if (pathname === '/git/findByPartialName') {
+        apiHitCounts['GET /git/findByPartialName']++;
         const name = query.name;
         if (!name) return err400(res, 'Provide ?name=<partialName>');
 
@@ -492,6 +539,7 @@ const server = http.createServer(async (req, res) => {
     /* ── GET /search?repo=<name>&text=<text> ─────────────────── */
     /*   Full text search across files, returns line matches      */
     if (pathname === '/git/search') {
+        apiHitCounts['GET /git/search']++;
         const text = query.text;
         if (!text) return err400(res, 'Provide ?text=<searchText>');
 
@@ -541,6 +589,7 @@ const server = http.createServer(async (req, res) => {
     /* ── POST /readFiles   body: ["/abs/path1", "/abs/path2"] ── */
     /*   Batch read multiple files by absolute path              */
     if (pathname === '/git/readFiles' && req.method === 'POST') {
+        apiHitCounts['POST /git/readFiles']++;
         let filePaths;
         try { filePaths = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
         if (!Array.isArray(filePaths) || filePaths.length === 0) {
@@ -564,6 +613,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /pull?repo=<name> ───────────────────────────────── */
     if (pathname === '/git/pull') {
+        apiHitCounts['GET /git/pull']++;
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         const repo = findRepo(query.repo);
         if (!repo) return err404(res, `Repo "${query.repo}" not found`);
@@ -576,6 +626,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /writeFile  body: { repo, path, content } ──────── */
     if (pathname === '/git/writeFile' && req.method === 'POST') {
+        apiHitCounts['POST /git/writeFile']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -604,6 +655,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /deleteFile  body: { repo, path } ─────────────── */
     if (pathname === '/git/deleteFile' && req.method === 'POST') {
+        apiHitCounts['POST /git/deleteFile']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -636,6 +688,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /createDir  body: { repo, path } ──────────────── */
     if (pathname === '/git/createDir' && req.method === 'POST') {
+        apiHitCounts['POST /git/createDir']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -661,6 +714,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── POST /renameFile  body: { repo, oldPath, newPath } ──── */
     if (pathname === '/git/renameFile' && req.method === 'POST') {
+        apiHitCounts['POST /git/renameFile']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -691,6 +745,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /diff?repo=&staged=&branch=&commit= ────────────── */
     if (pathname === '/git/diff') {
+        apiHitCounts['GET /git/diff']++;
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         const repo = findRepo(query.repo);
         if (!repo) return err404(res, `Repo "${query.repo}" not found`);
@@ -711,6 +766,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── GET /show?repo=&commit= ─────────────────────────────── */
     if (pathname === '/git/show') {
+        apiHitCounts['GET /git/show']++;
         if (!query.repo) return err400(res, 'Provide ?repo=<repoName>');
         if (!query.commit) return err400(res, 'Provide ?commit=<commitHash>');
         const repo = findRepo(query.repo);

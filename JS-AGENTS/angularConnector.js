@@ -419,6 +419,17 @@ function addRouteToFile(cleanRoute, cleanComponent, componentDir) {
     }
 }
 
+/* ------------------ API HIT TRACKING ------------------ */
+
+const apiHitCounts = {
+    'POST /component/get': 0,
+    'POST /component/create': 0,
+    'POST /component/update': 0,
+    'GET /logs': 0,
+    'GET /routes': 0,
+    'POST /routes': 0
+};
+
 /* ------------------ SERVER ------------------ */
 
 const server = http.createServer(async (req, res) => {
@@ -450,8 +461,14 @@ const server = http.createServer(async (req, res) => {
         });
     }
 
+    /* -------- INSIGHT -------- */
+    if (parsedUrl.pathname === '/insights' && req.method === 'GET') {
+        return respond(200, { apiHitCounts });
+    }
+
     /* -------- 0. GET COMPONENT FILES (POST /component/get) -------- */
     if (parsedUrl.pathname === '/component/get') {
+        apiHitCounts['POST /component/get']++;
         let body;
         try {
             body = await readBody(req);
@@ -561,6 +578,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- 1. CREATE COMPONENT (POST /component/create) -------- */
     if (parsedUrl.pathname === '/component/create' && req.method === 'POST') {
+        apiHitCounts['POST /component/create']++;
         let body;
         try {
             body = await readBody(req);
@@ -752,6 +770,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- 2. UPDATE COMPONENT (POST /component/update) -------- */
     if (parsedUrl.pathname === '/component/update' && req.method === 'POST') {
+        apiHitCounts['POST /component/update']++;
         let body;
         try {
             body = await readBody(req);
@@ -893,6 +912,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- 3. GET LAST 20 LINES OF LOG (GET /logs) -------- */
     if (parsedUrl.pathname === '/logs' && req.method === 'GET') {
+        apiHitCounts['GET /logs']++;
         try {
             if (!fs.existsSync(LOG_FILE_PATH)) {
                 return respond(200, { logFile: LOG_FILE_PATH, lines: [] });
@@ -914,6 +934,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- 4. GET ROUTES FILE CONTENT (GET /routes) -------- */
     if (parsedUrl.pathname === '/routes' && req.method === 'GET') {
+        apiHitCounts['GET /routes']++;
         if (!ROUTES_FILE) {
             return respond(404, { error: 'Routes file not found in this project' });
         }
@@ -931,6 +952,7 @@ const server = http.createServer(async (req, res) => {
 
     /* -------- 5. ADD ROUTE (POST /routes) -------- */
     if (parsedUrl.pathname === '/routes' && req.method === 'POST') {
+        apiHitCounts['POST /routes']++;
         if (!ROUTES_FILE) {
             return respond(404, { error: 'Routes file not found - cannot add route' });
         }

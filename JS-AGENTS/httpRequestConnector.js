@@ -138,6 +138,16 @@ function makeRequest(opts) {
 }
 
 /* ================================================================
+   API HIT TRACKING
+   ================================================================ */
+
+const apiHitCounts = {
+    'POST /request': 0,
+    'POST /batch': 0,
+    'POST /probe': 0
+};
+
+/* ================================================================
    SERVER
    ================================================================ */
 
@@ -151,6 +161,11 @@ const server = http.createServer(async (req, res) => {
 
     const parsed = url.parse(req.url, true);
     const { pathname } = parsed;
+
+    /* ── GET /insights ─────────────────────────────────────────── */
+    if (pathname === '/insights' && req.method === 'GET') {
+        return send(res, 200, { apiHitCounts });
+    }
 
     /* ── GET /health ─────────────────────────────────────────── */
     if (pathname === '/health' && req.method === 'GET') {
@@ -173,6 +188,7 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/request' && req.method === 'POST') {
+        apiHitCounts['POST /request']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -206,6 +222,7 @@ const server = http.createServer(async (req, res) => {
        }
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/batch' && req.method === 'POST') {
+        apiHitCounts['POST /batch']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
@@ -264,6 +281,7 @@ const server = http.createServer(async (req, res) => {
        Useful to check if a Spring Boot app has started yet.
        ─────────────────────────────────────────────────────────── */
     if (pathname === '/probe' && req.method === 'POST') {
+        apiHitCounts['POST /probe']++;
         let body;
         try { body = await readBody(req); } catch { return err400(res, 'Invalid JSON body'); }
 
