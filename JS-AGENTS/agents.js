@@ -359,7 +359,7 @@ function callAiApiRaw(aiApiEndpoint, messages, options = {}) {
  *   { bailed: true, response: { isError: true, errorMessage, retryable } }
  */
 async function callAiApiResilient(aiApiEndpoint, messages, options, sharedErrors, originalPrompt) {
-  for (;;) {
+  for (; ;) {
     const result = await callAiApiRaw(aiApiEndpoint, messages, options);
 
     if (!result.isError) {
@@ -523,20 +523,32 @@ Respond with ONLY strict JSON (no markdown fences, no commentary) matching exact
 function buildSummaryPrompt({ prompt, executionHistory, finalPrompt }) {
   const historyBlock = executionHistory.length
     ? executionHistory
-      .map((entry, index) => `${index + 1}. ${entry.httpMethod} ${entry.endpoint} → ${entry.success ? 'OK' : `FAILED: ${entry.error}`}`)
+      .map((entry, index) => {
+        const outcome = entry.success
+          ? `OK\n   response data: ${truncateText(JSON.stringify(entry.data ?? null))}`
+          : `FAILED: ${entry.error}`;
+        return `${index + 1}. ${entry.httpMethod} ${entry.endpoint} → ${outcome}`;
+      })
       .join('\n')
     : '(no calls were executed for this task)';
 
-  return `The task below has already been completed. Write a concise summary of what was actually done, based on the execution log - speak in the past tense, do not describe it as upcoming.
+  return `The task below has already been completed. Write a concise, detail-rich summary of what was actually done, based ONLY on the execution log below - speak in the past tense, do not describe it as upcoming.
 
 ## Original task
 ${prompt || '(empty prompt)'}
 
-## Calls executed
+## Calls executed, with the actual response data returned by each API
 ${historyBlock}
 
 ## Guidance
 ${finalPrompt || '(none - infer the summary from the execution log above)'}
+
+## Summary instructions
+- Pull out concrete, verifiable details from the "response data" shown above for each call - e.g. any file paths, directory paths, identifiers, names, URLs, routes, ports, statuses, counts, or other structured fields the API actually returned. Different agents return different fields; look at whatever keys are present in each response and mention the ones that matter for this task.
+- Do NOT include the contents of any file - only reference paths, names, or locations if the response data provides them.
+- Do NOT invent or assume details that are not present in the response data above. If a response didn't return a particular detail (e.g. no URL was given), don't state one.
+- If a call failed, mention what failed and why using the error text shown - don't imply it succeeded.
+- Keep it factual and specific rather than generic ("a file was created" is weaker than naming the actual path if the response data includes it).
 
 Respond directly with the summary text, in plain text (no JSON, no markdown fences).`;
 }
