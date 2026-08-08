@@ -47,7 +47,7 @@ fi
 
 # Step 5: Create workspace directory
 echo "Step 5: Setting up workspace..."
-WORKSPACE_DIR="$(pwd)"
+WORKSPACE_DIR="$HOME"
 cd "$WORKSPACE_DIR"
 
 # Step 6: Clone repository if not already cloned
