@@ -37,12 +37,12 @@ Create and run a Docker image using the Dockerfile:
 git clone https://github.com/devashish234073/cloud-pc-templates-marketplace
 cd cloud-pc-templates-marketplace/cloud-pc-templates
 docker build -t cloud-pc-templates-agents .
-docker run -p 3005-3050:3005-3050 -p 4200:4200 cloud-pc-templates-agents
+docker run -p 3005-3100:3005-3100 -p 4200:4200 cloud-pc-templates-agents
 ```
 
 Or run directly from DockerHub:
 ```bash
-docker run -p 3005-3050:3005-3050 -p 4200:4200 devashish234073/cloud-pc-templates-agents
+docker run -p 3005-3100:3005-3100 -p 4200:4200 devashish234073/cloud-pc-templates-agents
 ```
 
 ---
