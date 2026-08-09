@@ -20,6 +20,7 @@
 | PATCH | `/maven/class` | Patch a Java class via search-and-replace |
 | **GET** | **`/maven/classes`** | **List all Java source files in the project** |
 | POST | `/maven/dependency` | Add/update one dependency in pom.xml |
+| **GET** | **`/maven/tree`** | **Return project file/folder tree (excludes node_modules, target, dotfiles)** |
 | POST | `/maven/dependencies` | Add/update multiple dependencies |
 | GET | `/maven/dependencies` | List pom dependencies + resolved versions |
 | GET | `/maven/plugins` | List build plugins |
@@ -65,6 +66,14 @@ Create via `mvn archetype:generate`.
   "archetypeGroupId": "org.apache.maven.archetypes", "archetypeArtifactId": "maven-archetype-quickstart",
   "archetypeVersion": "1.4", "javaVersion": "17" }
 ```
+
+### `GET /maven/tree?projectName=`
+Nested file/folder tree for one project. Use this to explore the project tree of a java project. Excludes `node_modules`, `target`, dotfiles/dotfolders (`.git`, `.idea`, `.mvn`). Dirs listed before files, alphabetical.
+**Query params:** `projectName`
+```json
+{"message":"Project tree read successfully","projectName":"my-app","rootPath":"/base/my-app","excluded":["node_modules","target","dotfiles/dotfolders (.*)"],"fileCount":8,"directoryCount":4,"tree":[{"name":"src","type":"directory","path":"src","children":[{"name":"pom.xml","type":"file","path":"pom.xml","size":2103}]}]}
+```
+Node shape: `{name,type:"directory",path,children:[...]}` or `{name,type:"file",path,size}`. `path` relative to project root; `rootPath` is absolute.
 
 ---
 

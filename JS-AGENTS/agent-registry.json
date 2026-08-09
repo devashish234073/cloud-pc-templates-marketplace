@@ -32,7 +32,7 @@
     {
         "id": "java-maven-spring connector",
         "name": "Java Maven Spring Connector",
-        "currentVersion": "5.1",
+        "currentVersion": "6.0",
         "port": 3038,
         "risky": true,
         "risk": "This agent can write arbitrary java code based on your ask, so use it at your own risk as if the llm can send risky code, the api will execute it. When exploring website which has prompt injection it can be able to run un-intended code.",

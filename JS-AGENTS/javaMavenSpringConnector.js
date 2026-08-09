@@ -906,6 +906,7 @@ function execPromise(cmd, opts = {}) {
    ================================================================ */
 
 const apiHitCounts = {
+    'GET /maven/tree': 0,
     'GET /maven/class': 0,
     'GET /maven/classes': 0,
     'GET /maven/projects': 0,
@@ -935,6 +936,64 @@ const apiHitCounts = {
     'GET /maven/resources': 0
 };
 
+/**
+ * Build a nested tree of a project's files/folders.
+ * Excludes: node_modules, target, and any dir/file starting with '.'
+ */
+function buildProjectTree(rootDir, currentDir = rootDir) {
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    const children = [];
+
+    for (const entry of entries) {
+        const name = entry.name;
+
+        if (name.startsWith('.')) continue;
+        if (entry.isDirectory() && (name === 'node_modules' || name === 'target')) continue;
+
+        const fullPath = path.join(currentDir, name);
+
+        if (entry.isDirectory()) {
+            children.push({
+                name,
+                type: 'directory',
+                path: path.relative(rootDir, fullPath),
+                children: buildProjectTree(rootDir, fullPath)
+            });
+        } else {
+            const stat = fs.statSync(fullPath);
+            children.push({
+                name,
+                type: 'file',
+                path: path.relative(rootDir, fullPath),
+                size: stat.size
+            });
+        }
+    }
+
+    // directories first, then files, both alphabetical
+    children.sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    });
+
+    return children;
+}
+
+function countTreeNodes(nodes) {
+    let files = 0, dirs = 0;
+    for (const node of nodes) {
+        if (node.type === 'directory') {
+            dirs++;
+            const sub = countTreeNodes(node.children);
+            files += sub.files;
+            dirs += sub.dirs;
+        } else {
+            files++;
+        }
+    }
+    return { files, dirs };
+}
+
 /* ================================================================
    SERVER
    ================================================================ */
@@ -960,13 +1019,50 @@ const server = http.createServer(async (req, res) => {
         const reqs = await checkRequirements();
         return send(res, 200, {
             status: 'UP',
-            version: '5.1',
+            version: '6.0',
             type: 'java-maven-spring-agent',
             baseDir: BASE_DIR,
             projectCount: projects.size,
             projects: [...projects.keys()],
             requirements: reqs
         });
+    }
+
+    /* ── GET /maven/tree – Return project file/folder tree ────
+       Query: ?projectName=my-app
+       Excludes: node_modules, target, and any dotfiles/dotfolders
+       ─────────────────────────────────────────────────────────── */
+    if (pathname === '/maven/tree' && req.method === 'GET') {
+        apiHitCounts['GET /maven/tree']++;
+        const { projectName } = query;
+        if (!projectName) return err400(res, 'Provide ?projectName=<name>');
+
+        if (!projects.has(projectName)) {
+            return send(res, 404, { error: 'Project does not exist.', projectName });
+        }
+
+        const project = projects.get(projectName);
+
+        if (!fs.existsSync(project.path)) {
+            return err404(res, `Project directory not found on disk: ${project.path}`);
+        }
+
+        try {
+            const tree = buildProjectTree(project.path);
+            const counts = countTreeNodes(tree);
+
+            return send(res, 200, {
+                message: 'Project tree read successfully',
+                projectName,
+                rootPath: path.resolve(project.path),
+                excluded: ['node_modules', 'target', 'dotfiles/dotfolders (.*)'],
+                fileCount: counts.files,
+                directoryCount: counts.dirs,
+                tree
+            });
+        } catch (e) {
+            return err500(res, `Failed to build project tree: ${e.message}`);
+        }
     }
 
     /* ── GET /maven/class – Read a Java class source ──────────
@@ -2527,6 +2623,7 @@ const server = http.createServer(async (req, res) => {
         availableEndpoints: [
             'GET  /health',
             'GET  /maven/projects',
+            'GET  /maven/tree?projectName=         -- Returns project file/folder tree (excludes node_modules, target, dotfiles)',
             'POST /maven/create                   { groupId, artifactId, version?, archetypeGroupId?, archetypeArtifactId?, archetypeVersion?, javaVersion? }',
             'POST /spring/create                  { groupId, artifactId, packageName?, parent?, properties?, dependencies?, plugins?, applicationProperties? }',
             'POST /spring/crud?projectName=       { resourceName, packageName?, path?, fields? }',
@@ -2560,6 +2657,7 @@ server.listen(PORT, () => {
     console.log('\nAvailable endpoints:');
     console.log('  GET  /health                         - Server status & requirement check');
     console.log('  GET  /maven/projects                 - List all tracked projects');
+    console.log('  GET  /maven/tree?projectName=        - Get project file/folder tree');
     console.log('  POST /maven/create                   - Create a new Maven project');
     console.log('  POST /spring/create                  - Create a configurable Spring Boot Maven application');
     console.log('  POST /spring/crud?projectName=       - Generate entity/repository/service/controller CRUD');
