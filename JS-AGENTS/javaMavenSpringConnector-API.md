@@ -68,7 +68,7 @@ Create via `mvn archetype:generate`.
 ```
 
 ### `GET /maven/tree?projectName=`
-Nested file/folder tree for one project. Use this to explore the project tree of a java project. Excludes `node_modules`, `target`, dotfiles/dotfolders (`.git`, `.idea`, `.mvn`). Dirs listed before files, alphabetical.
+Nested file/folder tree for one project. Use this to explore the project tree or structure of a java project. Excludes `node_modules`, `target`, dotfiles/dotfolders (`.git`, `.idea`, `.mvn`). Dirs listed before files, alphabetical.
 **Query params:** `projectName`
 ```json
 {"message":"Project tree read successfully","projectName":"my-app","rootPath":"/base/my-app","excluded":["node_modules","target","dotfiles/dotfolders (.*)"],"fileCount":8,"directoryCount":4,"tree":[{"name":"src","type":"directory","path":"src","children":[{"name":"pom.xml","type":"file","path":"pom.xml","size":2103}]}]}
