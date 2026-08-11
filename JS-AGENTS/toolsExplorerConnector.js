@@ -303,6 +303,13 @@ const server = http.createServer(async (req, res) => {
         }));
     }
 
+    if (parsedUrl.pathname === '/apidoc' && req.method === 'GET') {
+        const content = getApiDocContent();
+        if (!content) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: 'API doc not found' })); }
+        res.writeHead(200, { 'Content-Type': 'text/markdown' });
+        return res.end(content);
+    }
+
     /* -------- INSIGHT -------- */
     if (parsedUrl.pathname === '/insights') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -465,6 +472,18 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not Found' }));
 });
+
+function getApiDocContent() {
+  const scriptPath = process.argv[1];
+  const dir = path.dirname(scriptPath);
+  const baseName = path.basename(scriptPath, path.extname(scriptPath));
+  const apiFileName = `${baseName}-API.md`;
+  const sameDirPath = path.join(dir, apiFileName);
+  if (fs.existsSync(sameDirPath)) return fs.readFileSync(sameDirPath, 'utf-8');
+  const parentDirPath = path.join(dir, '..', apiFileName);
+  if (fs.existsSync(parentDirPath)) return fs.readFileSync(parentDirPath, 'utf-8');
+  return null;
+}
 
 server.listen(PORT, () => {
     console.log(`Tools Explorer running at http://localhost:${PORT}`);

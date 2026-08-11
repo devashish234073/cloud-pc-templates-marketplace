@@ -1,6 +1,8 @@
 const http = require('http');
 const https = require('https');
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = 3039;
 const VERSION = '1.0';
@@ -177,6 +179,13 @@ const server = http.createServer(async (req, res) => {
         });
     }
 
+    if (pathname === '/apidoc' && req.method === 'GET') {
+        const content = getApiDocContent();
+        if (!content) return send(res, 404, { error: 'API doc not found' });
+        res.writeHead(200, { 'Content-Type': 'text/markdown' });
+        return res.end(content);
+    }
+
     /* ── POST /request – Execute a single HTTP request ──────────
        Body: {
          url:       "https://api.example.com/users",   // required
@@ -327,6 +336,18 @@ const server = http.createServer(async (req, res) => {
         ]
     });
 });
+
+function getApiDocContent() {
+  const scriptPath = process.argv[1];
+  const dir = path.dirname(scriptPath);
+  const baseName = path.basename(scriptPath, path.extname(scriptPath));
+  const apiFileName = `${baseName}-API.md`;
+  const sameDirPath = path.join(dir, apiFileName);
+  if (fs.existsSync(sameDirPath)) return fs.readFileSync(sameDirPath, 'utf-8');
+  const parentDirPath = path.join(dir, '..', apiFileName);
+  if (fs.existsSync(parentDirPath)) return fs.readFileSync(parentDirPath, 'utf-8');
+  return null;
+}
 
 server.listen(PORT, () => {
     console.log(`\nHTTP Request Connector v${VERSION} running at http://localhost:${PORT}`);

@@ -2,6 +2,8 @@ const http = require("http");
 const https = require("https");
 const { URL } = require("url");
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
 const PORT = 3031;
 
 /**
@@ -160,6 +162,11 @@ const server = http.createServer(async (req, res) => {
             version: '2.0',
             type: 'agent'
         }));
+    } else if (parsedUrl.pathname === '/apidoc' && req.method === 'GET') {
+        const content = getApiDocContent();
+        if (!content) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: 'API doc not found' })); }
+        res.writeHead(200, { 'Content-Type': 'text/markdown' });
+        return res.end(content);
     } else if (parsedUrl.pathname === '/insights') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ apiHitCounts }));
@@ -224,6 +231,18 @@ const message = `
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
   `;
+
+function getApiDocContent() {
+  const scriptPath = process.argv[1];
+  const dir = path.dirname(scriptPath);
+  const baseName = path.basename(scriptPath, path.extname(scriptPath));
+  const apiFileName = `${baseName}-API.md`;
+  const sameDirPath = path.join(dir, apiFileName);
+  if (fs.existsSync(sameDirPath)) return fs.readFileSync(sameDirPath, 'utf-8');
+  const parentDirPath = path.join(dir, '..', apiFileName);
+  if (fs.existsSync(parentDirPath)) return fs.readFileSync(parentDirPath, 'utf-8');
+  return null;
+}
 
 server.listen(PORT, () => {
     console.log(`Web Search API running on http://localhost:${PORT}\n${message}`);
