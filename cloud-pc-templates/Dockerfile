@@ -29,5 +29,4 @@ EXPOSE 3000-3100
 EXPOSE 4200
 
 CMD bash -c '\
-cd /workspace/cloud-pc-templates-marketplace/cloud-pc-templates && ./setup_and_run.sh\
-wait'
+cd /workspace/cloud-pc-templates-marketplace/cloud-pc-templates && ls && ./setup_and_run.sh && wait'
