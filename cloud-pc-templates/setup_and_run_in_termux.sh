@@ -123,10 +123,13 @@ for zip in *.zip; do
         
         # If package.json exists, run npm install and npm start
         if [ -f package.json ]; then
-            npm install
+          if npm install && [ -f package.json ]; then
             echo "Running npm start in: ${zip%.zip}"
             npm start &
             PIDS+=($!)
+          else
+            echo "WARNING: npm install failed for ${zip%.zip}"
+          fi
         fi
         
         cd ..
