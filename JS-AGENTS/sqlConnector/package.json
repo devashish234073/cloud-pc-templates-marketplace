@@ -1,0 +1,14 @@
+{
+  "name": "sql-connector",
+  "version": "1.0.0",
+  "description": "A lightweight HTTP server for running MySQL queries via CLI",
+  "main": "sqlConnector.js",
+  "scripts": {
+    "start": "node sqlConnector.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": ["mysql", "sql", "connector", "http-server"],
+  "license": "MIT"
+}

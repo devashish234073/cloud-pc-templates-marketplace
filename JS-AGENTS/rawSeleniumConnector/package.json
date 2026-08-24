@@ -1,0 +1,20 @@
+{
+  "name": "rawseleniumconnector",
+  "version": "1.0.0",
+  "description": "",
+  "main": "rawSeleniumConnector.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node rawSeleniumConnector.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "selenium-webdriver": "^4.41.0",
+    "vm2": "^3.10.5"
+  }
+}

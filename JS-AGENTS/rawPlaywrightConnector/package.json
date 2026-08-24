@@ -1,0 +1,16 @@
+{
+  "name": "raw-playwright-connector",
+  "version": "1.0.0",
+  "description": "Playwright execution server — drop-in replacement for the Selenium connector",
+  "main": "rawPlaywrightConnector.js",
+  "scripts": {
+    "start": "node rawPlaywrightConnector.js",
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "playwright": "^1.44.0",
+    "vm2": "^3.9.19"
+  }
+}

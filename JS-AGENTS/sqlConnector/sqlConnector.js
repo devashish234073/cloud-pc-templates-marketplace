@@ -1,0 +1,601 @@
+const http = require('http');
+const url = require('url');
+const fs = require('fs');
+const path = require('path');
+const { exec } = require('child_process');
+const PORT = 3037;
+
+/* ------------------ CREDENTIALS (edit these to match your setup) ------------------ */
+const DB_HOST     = 'localhost';
+const DB_PORT     = '3306';
+const DB_USER     = 'devas';
+const DB_PASSWORD = 'devas123';
+const DB_NAME     = 'cloud_pc_templates_agent';
+
+/* ------------------ SUDO HELPER ------------------ */
+const isRoot = process.getuid && process.getuid() === 0;
+const sudo = isRoot ? '' : 'sudo ';
+
+function getApiDocContent() {
+  const scriptPath = process.argv[1];
+  const dir = path.dirname(scriptPath);
+  const baseName = path.basename(scriptPath, path.extname(scriptPath));
+  const apiFileName = `${baseName}-API.md`;
+  const sameDirPath = path.join(dir, apiFileName);
+  if (fs.existsSync(sameDirPath)) return fs.readFileSync(sameDirPath, 'utf-8');
+  const parentDirPath = path.join(dir, '..', apiFileName);
+  if (fs.existsSync(parentDirPath)) return fs.readFileSync(parentDirPath, 'utf-8');
+  return null;
+}
+
+/* ------------------ QUERY METRICS MAP ------------------ */
+const queryMetrics = {};
+
+function recordQueryMetric(query, isError, timeTakenMs, totalRowsReturned) {
+    const normalizedQuery = query.trim();
+    if (!queryMetrics[normalizedQuery]) {
+        queryMetrics[normalizedQuery] = [];
+    }
+    queryMetrics[normalizedQuery].push({
+        timeTakenMs,
+        totalRowsReturned,
+        isError,
+        ranAt: new Date().toISOString()
+    });
+}
+
+/* ------------------ API HIT TRACKING ------------------ */
+
+const apiHitCounts = {
+    'GET /mysql/check': 0,
+    'GET /mysql/setup-or-status': 0,
+    'GET /mysql/query': 0,
+    'GET /mysql/query-metrics': 0,
+    'GET /mysql/create-user': 0
+};
+
+/* ------------------ HELPER: EXEC COMMAND ------------------ */
+function runCommand(command, options = {}) {
+    return new Promise((resolve) => {
+        exec(command, { timeout: 30000, ...options }, (error, stdout, stderr) => {
+            if (error) {
+                return resolve({ success: false, error: error.message, stderr: stderr?.trim() });
+            }
+            resolve({ success: true, output: (stdout || stderr || '').trim() });
+        });
+    });
+}
+
+/* ------------------ HELPER: PARSE QUERY STRING MANUALLY ------------------ */
+function parseQuery(queryString) {
+    if (!queryString) return {};
+    const params = {};
+    const pairs = queryString.split('&');
+    for (const pair of pairs) {
+        const eqIndex = pair.indexOf('=');
+        if (eqIndex === -1) continue;
+        const key = decodeURIComponent(pair.slice(0, eqIndex).replace(/\+/g, ' '));
+        const value = decodeURIComponent(pair.slice(eqIndex + 1).replace(/\+/g, ' '));
+        params[key] = value;
+    }
+    return params;
+}
+
+/* ------------------ HELPER: MYSQL CLI QUERY ------------------ */
+function runMysqlQuery(query) {
+    return new Promise((resolve) => {
+        const cleanQuery = query.replace(/;+$/, '').trim();
+        const passArg = DB_PASSWORD ? `-p${DB_PASSWORD}` : '';
+
+        const cmd = `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${passArg} ${DB_NAME} --batch --silent -e "${cleanQuery.replace(/"/g, '\\"')};"`;
+
+        const startTime = Date.now();
+
+        exec(cmd, { timeout: 15000 }, (error, stdout, stderr) => {
+            const endTime = Date.now();
+            const timeTakenMs = endTime - startTime;
+
+            if (error) {
+                const rawError  = stderr?.trim() || error.message || '';
+                const codeMatch = rawError.match(/ERROR\s+(\d+)\s*\(([^)]+)\)/);
+                return resolve({
+                    success:      false,
+                    timeTakenMs,
+                    startedAt:    new Date(startTime).toISOString(),
+                    completedAt:  new Date(endTime).toISOString(),
+                    errorCode:    codeMatch ? codeMatch[1] : null,
+                    sqlState:     codeMatch ? codeMatch[2] : null,
+                    errorMessage: rawError,
+                    command:      cmd.replace(/-p\S+/, '-p[REDACTED]')
+                });
+            }
+
+            const raw   = stdout.trim();
+            const lines = raw.split('\n').filter(Boolean);
+
+            if (lines.length === 0) {
+                return resolve({
+                    success:     true,
+                    rows:        [],
+                    raw:         '',
+                    timeTakenMs,
+                });
+            }
+            const headers = lines[0].split('\t');
+            const rows = lines.slice(1).map(line => {
+                const cols = line.split('\t');
+                const obj  = {};
+                headers.forEach((h, i) => { obj[h] = cols[i] ?? null; });
+                return obj;
+            });
+
+            resolve({
+                success:     true,
+                rows,
+                headers,
+                rowCount:    rows.length,
+                raw,
+                timeTakenMs,
+            });
+        });
+    });
+}
+
+/* ------------------ MYSQL STATUS CHECK ------------------ */
+async function getMysqlStatus() {
+    const clientCheck = await runCommand('mysql --version');
+    if (!clientCheck.success) {
+        return { clientInstalled: false, serverReachable: false, error: 'mysql client not found' };
+    }
+
+    const passArg  = DB_PASSWORD ? `-p${DB_PASSWORD}` : '';
+    const pingCmd  = `mysqladmin -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${passArg} ping --connect-timeout=5`;
+    const pingResult = await runCommand(pingCmd);
+
+    return {
+        clientInstalled: true,
+        clientVersion: clientCheck.output,
+        serverReachable: pingResult.success && pingResult.output.includes('alive'),
+        pingOutput: pingResult.output || pingResult.error
+    };
+}
+
+/* ------------------ CREATE MYSQL USER ------------------ */
+async function createMysqlUser() {
+    const sql = [
+        `CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';`,
+        `GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost' WITH GRANT OPTION;`,
+        `FLUSH PRIVILEGES;`
+    ].join(' ');
+
+    const result = await runCommand(`${sudo}mysql -e "${sql}"`);
+    return {
+        step: 'create mysql user',
+        user: DB_USER,
+        ...result
+    };
+}
+
+/* ------------------ CREATE DATABASE ------------------ */
+async function checkAndEnsureDatabase() {
+    const checkSql = `SELECT COUNT(*) as count FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${DB_NAME}';`;
+
+    const passArg = DB_PASSWORD ? `-p${DB_PASSWORD}` : '';
+    let checkResult = await runCommand(
+        `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${passArg} --batch --silent -e "${checkSql}"`
+    );
+
+    if (!checkResult.success) {
+        checkResult = await runCommand(`${sudo}mysql --batch --silent -e "${checkSql}"`);
+    }
+
+    if (!checkResult.success) {
+        return { step: 'check database exists', exists: false, created: false, error: checkResult.error };
+    }
+
+    const count = parseInt(checkResult.output.split('\n').filter(l => l && l !== 'count')[0]) || 0;
+
+    if (count > 0) {
+        return { step: 'check database exists', exists: true, created: false, message: `Database '${DB_NAME}' already exists.` };
+    }
+
+    const createResult = await runCommand(`${sudo}mysql -e 'CREATE DATABASE IF NOT EXISTS ${DB_NAME};'`);
+    return {
+        step: 'check database exists',
+        exists: false,
+        created: createResult.success,
+        message: createResult.success ? `Database '${DB_NAME}' created successfully.` : 'Failed to create database.',
+        error: createResult.success ? null : createResult.error
+    };
+}
+
+/* ------------------ CHECK USER EXISTS ------------------ */
+async function checkAndEnsureUser() {
+    const checkSql = `SELECT COUNT(*) as count FROM mysql.user WHERE user='${DB_USER}' AND host='localhost';`;
+
+    const passArg = DB_PASSWORD ? `-p${DB_PASSWORD}` : '';
+    let checkResult = await runCommand(
+        `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${passArg} --batch --silent -e "${checkSql}"`
+    );
+
+    if (!checkResult.success) {
+        return { step: 'check user exists', exists: false, created: false, error: checkResult.error };
+    }
+
+    const count = parseInt(checkResult.output.split('\n').filter(l => l && l !== 'count')[0]) || 0;
+
+    if (count > 0) {
+        return { step: 'check user exists', exists: true, created: false, message: `User '${DB_USER}'@'localhost' already exists.` };
+    }
+
+    const createResult = await createMysqlUser();
+    return { step: 'check user exists', exists: false, created: createResult.success, ...createResult };
+}
+
+/* ------------------ MYSQL SETUP (install + init) ------------------ */
+async function setupMysql() {
+    const steps = [];
+
+    const update  = await runCommand(`${sudo}apt-get update -y`);
+    steps.push({ step: 'apt-get update', ...update });
+
+    const install = await runCommand(`${sudo}apt-get install -y mysql-server`);
+    steps.push({ step: 'install mysql-server', ...install });
+
+    const start   = await runCommand(`${sudo}service mysql start || ${sudo}systemctl start mysql`);
+    steps.push({ step: 'start mysql service', ...start });
+
+    await new Promise(r => setTimeout(r, 3000));
+
+    const userResult = await createMysqlUser();
+    steps.push(userResult);
+
+    const dbCreateResult = await checkAndEnsureDatabase();
+    steps.push(dbCreateResult);
+
+    const statusCheck = await getMysqlStatus();
+    steps.push({ step: 'post-install status check', ...statusCheck });
+
+    return { steps, finalStatus: statusCheck };
+}
+
+/* ------------------ GET DB INFO ------------------ */
+async function getDbInfo() {
+    const passArg  = DB_PASSWORD ? `-p${DB_PASSWORD}` : '';
+    const baseArgs = `-h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${passArg} --batch --silent`;
+
+    const [dbList, currentDb, serverVersion, processlist] = await Promise.all([
+        runCommand(`mysql ${baseArgs} -e "SHOW DATABASES;"`),
+        runCommand(`mysql ${baseArgs} -e "SELECT DATABASE();"`),
+        runCommand(`mysql ${baseArgs} -e "SELECT VERSION();"`),
+        runCommand(`mysql ${baseArgs} -e "SHOW STATUS LIKE 'Threads_connected';"`)
+    ]);
+
+    const databases = dbList.success
+        ? dbList.output.split('\n').filter(d => d && d !== 'Database')
+        : [];
+
+    const currentDatabase = currentDb.success
+        ? currentDb.output.split('\n').filter(l => l && l !== 'DATABASE()')[0] || null
+        : null;
+
+    const version = serverVersion.success
+        ? serverVersion.output.split('\n').filter(l => l && l !== 'VERSION()')[0] || null
+        : null;
+
+    const connections = (() => {
+        if (!processlist.success) return null;
+        const lines = processlist.output.split('\n');
+        for (const line of lines) {
+            if (line.startsWith('Threads_connected')) return line.split('\t')[1]?.trim() || null;
+        }
+        return null;
+    })();
+
+    return { databases, databaseCount: databases.length, currentDatabase, serverVersion: version, activeConnections: connections };
+}
+
+/* ------------------ ERROR HINT HELPER ------------------ */
+function getErrorHint(code, message) {
+    const hints = {
+        '1045': 'Access denied — check DB_USER and DB_PASSWORD.',
+        '1049': 'Unknown database — the database does not exist. Create it first.',
+        '1050': 'Table already exists — use CREATE TABLE IF NOT EXISTS to avoid this.',
+        '1051': 'Unknown table — the table you are trying to drop or query does not exist.',
+        '1054': 'Unknown column — check your column names match the table schema.',
+        '1064': 'SQL syntax error — check your query for typos or missing keywords.',
+        '1146': 'Table does not exist — run SHOW TABLES to see available tables.',
+        '1215': 'Foreign key constraint failure — check referenced table/column exists.',
+        '1216': 'Foreign key constraint violation on INSERT — parent row not found.',
+        '1217': 'Foreign key constraint violation on DELETE — child rows still exist.',
+        '1366': 'Incorrect integer value — a column received a value of the wrong type.',
+        '1406': 'Data too long for column — value exceeds the defined column length.',
+    };
+    if (code && hints[code]) return hints[code];
+    if (message && message.includes('syntax error')) return 'SQL syntax error — check your query for typos or missing keywords.';
+    return 'Check the errorMessage field for full details from MySQL.';
+}
+
+/* ================================================================
+   HTTP SERVER
+   ================================================================ */
+const server = http.createServer(async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        return res.end();
+    }
+
+    const parsedUrl = url.parse(req.url, false);
+    const pathname  = parsedUrl.pathname;
+    const query     = parseQuery(parsedUrl.query);
+
+    const send = (statusCode, data) => {
+        res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data, null, 2));
+    };
+
+    /* ----------------------------------------------------------
+       GET /health
+    ---------------------------------------------------------- */
+    if (pathname === '/health') {
+        return send(200, {
+            status: 'UP',
+            version: '8.0',
+            type: 'agent',
+            service: 'SQL Connector',
+            port: PORT,
+            endpoints: [
+                '/health',
+                '/insights',
+                '/mysql/check',
+                '/mysql/setup-or-status',
+                '/mysql/create-user',
+                '/mysql/query?q=SELECT+1',
+                '/mysql/query-metrics'
+            ]
+        });
+    }
+
+    /* ----------------------------------------------------------
+       GET /insights
+    ---------------------------------------------------------- */
+    if (pathname === '/insights') {
+        return send(200, { apiHitCounts });
+    }
+
+    if (pathname === '/apidoc' && req.method === 'GET') {
+        const content = getApiDocContent();
+        if (!content) return send(res, 404, { error: 'API doc not found' });
+        res.writeHead(200, { 'Content-Type': 'text/markdown' });
+        return res.end(content);
+    }
+
+    /* ----------------------------------------------------------
+       GET /mysql/check
+    ---------------------------------------------------------- */
+    if (pathname === '/mysql/check') {
+        apiHitCounts['GET /mysql/check']++;
+        const clientCheck     = await runCommand('mysql --version');
+        const mysqladminCheck = await runCommand('mysqladmin --version');
+
+        return send(200, {
+            mysqlClient: {
+                installed: clientCheck.success,
+                version:   clientCheck.success ? clientCheck.output : null,
+                error:     clientCheck.success ? null : clientCheck.error
+            },
+            mysqladmin: {
+                installed: mysqladminCheck.success,
+                version:   mysqladminCheck.success ? mysqladminCheck.output : null,
+                error:     mysqladminCheck.success ? null : mysqladminCheck.error
+            }
+        });
+    }
+
+    /* ----------------------------------------------------------
+       GET /mysql/setup-or-status
+    ---------------------------------------------------------- */
+    if (pathname === '/mysql/setup-or-status') {
+        apiHitCounts['GET /mysql/setup-or-status']++;
+        const status = await getMysqlStatus();
+
+        if (!status.serverReachable) {
+            const setupResult  = await setupMysql();
+            const postStatus   = await getMysqlStatus();
+
+            if (!postStatus.serverReachable) {
+                return send(200, {
+                    action: 'setup_attempted',
+                    setupSucceeded: false,
+                    message: 'MySQL was not reachable and automatic setup also failed. Manual intervention required.',
+                    preSetupStatus: status,
+                    setupSteps: setupResult.steps,
+                    postSetupStatus: postStatus
+                });
+            }
+
+            const dbInfo = await getDbInfo();
+            return send(200, {
+                action: 'setup_completed',
+                setupSucceeded: true,
+                message: 'MySQL was not running. It has been installed and started successfully.',
+                setupSteps: setupResult.steps,
+                server: { host: DB_HOST, port: DB_PORT, user: DB_USER },
+                ...dbInfo
+            });
+        }
+
+        const userCheck = await checkAndEnsureUser();
+        const dbCheck   = await checkAndEnsureDatabase();
+        const dbInfo    = await getDbInfo();
+        return send(200, {
+            action: 'status_reported',
+            message: 'MySQL server is reachable.',
+            server: {
+                host: DB_HOST,
+                port: DB_PORT,
+                user: DB_USER,
+                clientVersion: status.clientVersion,
+                pingOutput: status.pingOutput
+            },
+            userCheck,
+            dbCheck,
+            ...dbInfo
+        });
+    }
+
+    /* ----------------------------------------------------------
+       GET /mysql/query?q=SELECT+*+FROM+users
+    ---------------------------------------------------------- */
+    if (pathname === '/mysql/query') {
+        apiHitCounts['GET /mysql/query']++;
+        const sqlQuery = query.q || query.query || null;
+
+        if (!sqlQuery) {
+            return send(200, {
+                error: 'Missing required param: q (the SQL query to run)',
+                example: '/mysql/query?q=SELECT%20*%20FROM%20users'
+            });
+        }
+
+        const status = await getMysqlStatus();
+        if (!status.serverReachable) {
+            return send(200, {
+                error: 'MySQL server is not reachable. Use /mysql/setup-or-status to install and start it first.',
+                statusCheck: status
+            });
+        }
+
+        const result = await runMysqlQuery(sqlQuery);
+        if (!result.success) {
+            recordQueryMetric(sqlQuery, true, result.timeTakenMs, 0);
+
+            return send(200, {
+                error:        'Query execution failed',
+                query:        sqlQuery,
+                database:     DB_NAME,
+                timing: {
+                    timeTakenMs: result.timeTakenMs
+                },
+                errorCode:    result.errorCode    || null,
+                sqlState:     result.sqlState     || null,
+                errorMessage: result.errorMessage || null,
+                hint:         getErrorHint(result.errorCode, result.errorMessage)
+            });
+        }
+
+        recordQueryMetric(sqlQuery, false, result.timeTakenMs, result.rowCount);
+
+        return send(200, {
+            query:    sqlQuery,
+            database: DB_NAME,
+            server:   { host: DB_HOST, port: DB_PORT, user: DB_USER },
+            timing: {
+                timeTakenMs: result.timeTakenMs
+            },
+            rowCount: result.rowCount,
+            headers:  result.headers,
+            rows:     result.rows
+        });
+    }
+
+    /* ----------------------------------------------------------
+       GET /mysql/query-metrics
+    ---------------------------------------------------------- */
+    if (pathname === '/mysql/query-metrics') {
+        apiHitCounts['GET /mysql/query-metrics']++;
+        const filterQuery = query.q || query.query || null;
+
+        if (filterQuery) {
+            const normalized = filterQuery.trim();
+            const history = queryMetrics[normalized] || [];
+            const totalRuns = history.length;
+            const avgTimeMs = totalRuns > 0
+                ? Math.round(history.reduce((sum, m) => sum + m.timeTakenMs, 0) / totalRuns)
+                : 0;
+
+            return send(200, {
+                query:       normalized,
+                totalRuns,
+                avgTimeMs,
+                history
+            });
+        }
+
+        const summary = {};
+        for (const [q, runs] of Object.entries(queryMetrics)) {
+            const totalRuns = runs.length;
+            const avgTimeMs = totalRuns > 0
+                ? Math.round(runs.reduce((sum, m) => sum + m.timeTakenMs, 0) / totalRuns)
+                : 0;
+            summary[q] = {
+                totalRuns,
+                avgTimeMs,
+                history: runs
+            };
+        }
+
+        return send(200, {
+            totalDistinctQueries: Object.keys(queryMetrics).length,
+            metrics: summary
+        });
+    }
+
+    /* ----------------------------------------------------------
+       GET /mysql/create-user
+    ---------------------------------------------------------- */
+    if (pathname === '/mysql/create-user') {
+        apiHitCounts['GET /mysql/create-user']++;
+        const result = await createMysqlUser();
+        if (!result.success) {
+            return send(200, {
+                error: 'Failed to create MySQL user',
+                user: DB_USER,
+                details: result.error || result.stderr
+            });
+        }
+        return send(200, {
+            message: `User '${DB_USER}'@'localhost' created/verified successfully.`,
+            note: 'GRANT ALL PRIVILEGES has been applied. You can now connect using DB_USER and DB_PASSWORD.',
+            user: DB_USER
+        });
+    }
+
+    /* ----------------------------------------------------------
+       404
+    ---------------------------------------------------------- */
+    return send(200, {
+        error: 'Not Found',
+        availableEndpoints: [
+            'GET /health',
+            'GET /insights',
+            'GET /mysql/check',
+            'GET /mysql/setup-or-status',
+            'GET /mysql/create-user',
+            'GET /mysql/query?q=<sql>',
+            'GET /mysql/query-metrics',
+            'GET /mysql/query-metrics?q=<sql>'
+        ]
+    });
+});
+
+server.listen(PORT, async () => {
+    console.log(`SQL Connector running at http://localhost:${PORT}`);
+    console.log('');
+    console.log(`Running as: ${isRoot ? 'root (no sudo needed)' : 'non-root (sudo will be used)'}`);
+    console.log(`Connecting as: ${DB_USER}@${DB_HOST}:${DB_PORT}`);
+    console.log('');
+    console.log('Endpoints:');
+    console.log(`  GET http://localhost:${PORT}/health`);
+    console.log(`  GET http://localhost:${PORT}/insights`);
+    console.log(`  GET http://localhost:${PORT}/mysql/check`);
+    console.log(`  GET http://localhost:${PORT}/mysql/setup-or-status`);
+    console.log(`  GET http://localhost:${PORT}/mysql/create-user`);
+    console.log(`  GET http://localhost:${PORT}/mysql/query?q=SHOW+TABLES`);
+    console.log(`  GET http://localhost:${PORT}/mysql/query-metrics`);
+    console.log(`  GET http://localhost:${PORT}/mysql/query-metrics?q=SHOW+TABLES`);
+});

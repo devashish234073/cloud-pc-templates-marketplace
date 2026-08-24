@@ -1,3 +1,7 @@
 marketplace_info_list.json
 JS-AGENTS/*/
+JS-AGENTS/*/node_modules/
+!JS-AGENTS/sqlConnector/
+!JS-AGENTS/rawPlaywrightConnector/
+!JS-AGENTS/rawSeleniumConnector/
 .*
