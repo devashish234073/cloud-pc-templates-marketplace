@@ -114,13 +114,16 @@ echo ""
 echo "Processing ZIP files..."
 for zip in *.zip; do
     if [ -f "$zip" ]; then
+        target="${zip%.zip}"
         echo "Processing zip: $zip"
-        
-        # Extract zip file
-        unzip -o "$zip" -d "${zip%.zip}"
-        
-        # Navigate to extracted directory
-        cd "${zip%.zip}"
+
+        if [ -d "$target" ]; then
+            echo "Directory $target already exists, skipping unzip"
+        else
+            unzip -o "$zip" -d "$target"
+        fi
+
+        cd "$target"
         
         # If package.json exists, run npm install and npm start
         if [ -f package.json ]; then
