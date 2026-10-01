@@ -128,6 +128,43 @@ function callOllamaChat(body, callback) {
 }
 
 /* =========================================================
+   CALL LOCAL OLLAMA SYSTEMONE
+========================================================= */
+
+function callOllamaSystemOne(body, callback) {
+    const payload = JSON.stringify(body);
+
+    const options = {
+        hostname: OLLAMA_HOST,
+        port: OLLAMA_PORT,
+        path: '/v1/systemone',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+        }
+    };
+
+    const req = http.request(options, res => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+            if (!data.trim()) return callback(null, {});
+
+            try {
+                callback(null, JSON.parse(data));
+            } catch (err) {
+                callback(err);
+            }
+        });
+    });
+
+    req.on('error', err => callback(err));
+    req.write(payload);
+    req.end();
+}
+
+/* =========================================================
    STREAMING CHAT
 ========================================================= */
 
@@ -299,6 +336,36 @@ const server = http.createServer((req, res) => {
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(transformed));
+                });
+
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: "Invalid JSON body" }));
+            }
+        });
+
+        return;
+    }
+
+    /* -------- SYSTEMONE -------- */
+    if (req.method === 'POST' && req.url === '/v1/systemone') {
+
+        let body = '';
+
+        req.on('data', chunk => body += chunk);
+
+        req.on('end', () => {
+            try {
+                const parsedBody = JSON.parse(body);
+
+                callOllamaSystemOne(parsedBody, (err, ollamaResp) => {
+                    if (err) {
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        return res.end(JSON.stringify({ error: err.message }));
+                    }
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(ollamaResp));
                 });
 
             } catch (err) {
