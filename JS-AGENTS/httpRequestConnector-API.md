@@ -2,8 +2,6 @@
 "agentId": "http-request-connector"
 **Port:** `3039` | **Base URL:** `http://localhost:3039`
 
-**Startup:** `node httpRequestConnector.js` (no `npm install` needed — zero dependencies)
-
 Use this connector when the orchestrator needs to call any HTTP/HTTPS endpoint directly: testing a locally running Spring Boot app, hitting a REST API, polling a health check, or verifying a response without spinning up a full browser. Think of it as `curl` accessible over HTTP.
 
 ---
@@ -21,18 +19,11 @@ Use this connector when the orchestrator needs to call any HTTP/HTTPS endpoint d
 
 ## Endpoints
 
-### `GET /health`
-```json
-{ "status": 200, "status": "UP", "version": "1.0", "type": "http-request-connector", "port": 3039 }
-```
-
----
-
-### `POST /request` — Single HTTP request
+POST /request
 
 The core endpoint. Executes one outbound HTTP or HTTPS request and returns the full response.
 
-**Body:**
+Sample Payload:
 ```json
 {
   "url":      "https://api.example.com/users",
@@ -53,7 +44,7 @@ The core endpoint. Executes one outbound HTTP or HTTPS request and returns the f
 | `timeout` | number | — | `30000` | Milliseconds before request is aborted |
 | `rawBody` | boolean | — | `false` | `true` = skip JSON parsing, always return raw string |
 
-**Response:**
+Sample Response:
 ```json
 {
   "status": 200,
@@ -77,31 +68,11 @@ The core endpoint. Executes one outbound HTTP or HTTPS request and returns the f
 
 `body` is auto-parsed as JSON when the response `Content-Type` is `application/json`. For all other types (HTML, plain text, XML) `body` and `rawBody` are both the raw string.
 
-**Example — test a locally running Spring Boot app:**
-```json
-{
-  "url": "http://localhost:8080/api/health",
-  "method": "GET"
-}
-```
-
-**Example — POST with auth header:**
-```json
-{
-  "url": "http://localhost:8080/api/products",
-  "method": "POST",
-  "headers": { "Content-Type": "application/json", "Authorization": "Bearer token123" },
-  "body": { "name": "Widget", "price": 9.99 }
-}
-```
-
----
-
-### `POST /batch` — Sequential multi-request
+POST /batch
 
 Executes up to 20 requests one after another. Useful for a setup sequence (create resource → update it → verify) or for calling multiple endpoints to compare responses.
 
-**Body:**
+Sample Payload:
 ```json
 {
   "requests": [
@@ -118,7 +89,7 @@ Executes up to 20 requests one after another. Useful for a setup sequence (creat
 | `requests` | array | — | Each entry has the same fields as `/request` body |
 | `stopOnError` | boolean | `false` | Abort on first network error or 4xx/5xx response |
 
-**Response:**
+Sample Response:
 ```json
 {
   "status": 200,
@@ -142,11 +113,11 @@ If a request fails (network error), its result entry has `{ "index": N, "url": "
 
 ---
 
-### `POST /probe` — Parallel reachability check
+POST /probe
 
 Fires GET requests to up to 10 URLs in parallel with a short timeout. Does not parse response bodies — only checks reachability and status code. Ideal for polling until a Spring Boot app finishes startup.
 
-**Body:**
+Sample Payload:
 ```json
 {
   "urls": [
@@ -165,7 +136,7 @@ Single URL shorthand: `{ "url": "http://localhost:8080/api/health" }` also accep
 | `url` | string | — | Shorthand for a single URL |
 | `timeout` | number | `5000` | Per-request timeout in ms |
 
-**Response:**
+Sample Response:
 ```json
 {
   "status": 200,
@@ -179,49 +150,3 @@ Single URL shorthand: `{ "url": "http://localhost:8080/api/health" }` also accep
 ```
 
 Unreachable URLs return `{ "reachable": false, "error": "connect ECONNREFUSED ..." }`.
-
----
-
-## Error responses
-
-All errors return HTTP 200 (so the orchestrator always gets a JSON body) with a non-200 `status` field:
-
-```json
-{ "status": 400, "error": "Provide { url: \"...\" } in body" }
-{ "status": 500, "error": "Request failed: connect ECONNREFUSED 127.0.0.1:8080" }
-```
-
----
-
-## Orchestrator usage patterns
-
-**Poll until app is up (use with /probe in a retry loop):**
-```
-POST /probe  { "url": "http://localhost:8080/api/health", "timeout": 2000 }
-→ reachable: false  →  wait, retry
-→ reachable: true   →  proceed
-```
-
-**CRUD verification sequence (use /batch with stopOnError):**
-```
-POST /batch {
-  requests: [
-    { POST /api/products  body: { name: "Widget" } },   // create
-    { GET  /api/products/1 },                           // verify created
-    { PUT  /api/products/1  body: { name: "Updated" }}, // update
-    { GET  /api/products/1 },                           // verify update
-    { DELETE /api/products/1 },                         // delete
-    { GET  /api/products/1 }                            // verify 404
-  ],
-  stopOnError: true
-}
-```
-
-**Test with custom auth headers:**
-```
-POST /request {
-  url: "http://localhost:8080/api/admin/users",
-  method: "GET",
-  headers: { "Authorization": "Bearer <token>" }
-}
-```

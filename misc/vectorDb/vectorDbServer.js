@@ -194,7 +194,52 @@ const RAW_GITHUB_PREFIXES = [
   'https://raw.githubusercontent.com/devashish234073/cloud-pc-templates-marketplace/main/',
 ];
 
+try {
+  fs.unlinkSync(PERSIST_PATH);
+  console.log(`[startup] Deleted existing persist file: ${PERSIST_PATH}`);
+} catch (err) {
+  console.error(`[startup] Failed to delete persist file ${PERSIST_PATH}:`, err.message);
+}
+
 function ensureLocalRepo() {
+  const repoDir = path.join(os.homedir(), REPO_DIR_NAME);
+
+  // Check two directories up for JS-AGENTS and JS-PROXIES folders
+  const twoDirsUp = path.resolve(__dirname, '..', '..');
+  const jsAgentsPath = path.join(twoDirsUp, 'JS-AGENTS');
+  const jsProxiesPath = path.join(twoDirsUp, 'JS-PROXIES');
+
+  console.log('🔍 Checking for local repo...');
+  console.log(`   Two directories up: ${twoDirsUp}`);
+  console.log(`   JS-AGENTS exists: ${fs.existsSync(jsAgentsPath)} (${jsAgentsPath})`);
+  console.log(`   JS-PROXIES exists: ${fs.existsSync(jsProxiesPath)} (${jsProxiesPath})`);
+
+  if (fs.existsSync(jsAgentsPath) && fs.existsSync(jsProxiesPath)) {
+    console.log(`✅ Found JS-AGENTS and JS-PROXIES. Using local repo at: ${twoDirsUp}`);
+    return twoDirsUp;
+  }
+
+  console.log(`⚠️  JS-AGENTS/JS-PROXIES not found two directories up. Falling back to homedir...`);
+
+  if (fs.existsSync(path.join(repoDir, '.git'))) {
+    try {
+      console.log(`   Pulling latest changes in: ${repoDir}`);
+      execSync('git pull', { cwd: repoDir, stdio: 'ignore' });
+      console.log(`   ✅ Pull successful`);
+    } catch (err) {
+      console.log(`   ⚠️  Pull failed: ${err.message}`);
+    }
+  } else {
+    console.log(`   Cloning ${REPO_CLONE_URL} into ${repoDir}`);
+    execSync(`git clone ${REPO_CLONE_URL} ${repoDir}`, { stdio: 'ignore' });
+    console.log(`   ✅ Clone successful`);
+  }
+
+  console.log(`📍 Using repo directory: ${repoDir}`);
+  return repoDir;
+}
+
+/*function ensureLocalRepo() {
   const repoDir = path.join(os.homedir(), REPO_DIR_NAME);
   if (fs.existsSync(path.join(repoDir, '.git'))) {
     try { execSync('git pull', { cwd: repoDir, stdio: 'ignore' }); } catch (_) {}
@@ -202,10 +247,11 @@ function ensureLocalRepo() {
     execSync(`git clone ${REPO_CLONE_URL} ${repoDir}`, { stdio: 'ignore' });
   }
   return repoDir;
-}
+}*/
 
 function readFromLocalRepo(relPath) {
   const repoDir = ensureLocalRepo();
+  console.log(`[local repo] Reading ${relPath} from ${repoDir}`);
   return fs.readFileSync(path.join(repoDir, relPath), 'utf8');
 }
 
@@ -317,9 +363,9 @@ async function embed(text) {
 function agentToText(agent) {
   return [
     `Agent: ${agent.name || agent.id}`,
-    agent.description    ? `Description: ${agent.description}`       : '',
-    agent.id           ? `"agentId": "${agent.id}"`                      : '',
-    agent.port           ? `Port: ${agent.port}`                      : ''
+    agent.description ? `Description: ${agent.description}` : '',
+    agent.id ? `"agentId": "${agent.id}"` : '',
+    agent.port ? `Port: ${agent.port}` : ''
   ].filter(Boolean).join('\n');
 }
 
@@ -465,15 +511,10 @@ async function seedFromRegistry() {
   console.log('[seed] Fetching agent registry from GitHub...');
   let registryText;
   try {
-    registryText = await fetchText(AGENT_REGISTRY_URL);
-  } catch (err) {
-    console.warn('[seed] Failed to fetch agent registry, falling back to local repo:', err.message);
-    try {
-      registryText = readFromLocalRepo('JS-AGENTS/agent-registry.json');
-    } catch (localErr) {
-      console.error('[seed] Local repo fallback also failed:', localErr.message);
-      return;
-    }
+    registryText = readFromLocalRepo('JS-AGENTS/agent-registry.json');
+  } catch (localErr) {
+    console.error('[seed] Local repo fallback also failed:', localErr.message);
+    return;
   }
 
   let agents;
@@ -513,21 +554,16 @@ async function seedFromRegistry() {
     // 2. Fetch and embed the API doc
     if (agent.apiDocUrl) {
       let apiDocText;
+      const relPath = urlToRepoRelPath(agent.apiDocUrl);
+      if (!relPath) {
+        console.error(`[seed]   ✗ Cannot map apiDocUrl to repo path for "${agentId}"`);
+        continue;
+      }
       try {
-        apiDocText = await fetchText(agent.apiDocUrl);
-      } catch (err) {
-        console.warn(`[seed]   ✗ Failed to fetch API doc for "${agentId}", trying local repo:`, err.message);
-        const relPath = urlToRepoRelPath(agent.apiDocUrl);
-        if (!relPath) {
-          console.error(`[seed]   ✗ Cannot map apiDocUrl to repo path for "${agentId}"`);
-          continue;
-        }
-        try {
-          apiDocText = readFromLocalRepo(relPath);
-        } catch (localErr) {
-          console.error(`[seed]   ✗ Local repo fallback failed for "${agentId}":`, localErr.message);
-          continue;
-        }
+        apiDocText = readFromLocalRepo(relPath);
+      } catch (localErr) {
+        console.error(`[seed]   ✗ Local repo fallback failed for "${agentId}":`, localErr.message);
+        continue;
       }
 
       const chunks = buildApiDocChunks(agent, apiDocText);
@@ -536,6 +572,7 @@ async function seedFromRegistry() {
       for (let i = 0; i < chunks.length; i++) {
         try {
           const vector = await embed(chunks[i].text);
+          console.log(`[seed]   ✓ Embedded API doc chunk ${i} for "${agentId}"`, { "agentId": chunks[i].metadata?.agentId, "method": chunks[i].metadata?.endpointMethod, "path": chunks[i].metadata?.endpointPath });
           db.insert(`agent:${agentId}:apidoc:${chunks[i].kind}:${i}`, vector, {
             ...chunks[i].metadata,
             chunkIndex: i,

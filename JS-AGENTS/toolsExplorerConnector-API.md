@@ -10,9 +10,11 @@ Response:
   "service": "Tools Explorer",
   "port": 3032
 }
-2. Get All Tool Versions
+
 GET http://localhost:3032/versions
-3. Get Specific Tool Version
+Get All Tool Versions
+
+To Get Specific Tool Version use:
 GET http://localhost:3032/version?tool=java
 GET http://localhost:3032/version?tool=maven
 GET http://localhost:3032/version?tool=node
@@ -35,8 +37,8 @@ Example Response (Installed)
   }
 }
 
-4. Timer Endpoint
 GET http://localhost:3032/timer
+Timer Endpoint
 
 Behavior:
 - Calling /timer without a ref query parameter creates a new timer reference and returns the current time in milliseconds plus a unique uuid.
@@ -57,8 +59,8 @@ Example Response (subsequent call)
   "elapsedMs": 2000
 }
 
-5. System Usage
 GET http://localhost:3032/system-usage
+System Usage
 
 Behavior:
 - Returns real-time CPU and RAM usage of the system.
@@ -81,8 +83,8 @@ Example Response:
   "platform": "linux"
 }
 
-6. NPM Activity Report
 GET http://localhost:3032/npm-activity
+NPM Activity Report
 
 Query Parameters:
 - `date` (optional): `YYYY-MM-DD` to report activity for a specific day. Defaults to today.

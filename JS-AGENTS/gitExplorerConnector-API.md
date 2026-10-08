@@ -40,8 +40,8 @@ List all files matching given extension(s). Comma-separated for multiple.
 Returns: {"extensions":["js","ts"],"count":42,"files":["/abs/path/file.js"]}
 
 GET /git/remoteUrl?repo=<folderName>
-All configured git remotes with fetch/push URLs.
-Returns: {"repoName":"my-app","remoteUrl":"https://...","remotes":{"origin":{"fetch":"https://...","push":"https://..."}}}
+All configured git remotes URLs.
+Returns: {"repoName":"my-app","remoteUrl":"https://...","remotes":{"origin":{....}}}
 
 GET /git/log?repo=<folderName>&branch=<branch>&limit=<n>
 Commit history. branch defaults to HEAD, limit defaults to 20 (max 200).

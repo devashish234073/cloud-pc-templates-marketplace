@@ -157,7 +157,8 @@ function findTextInFiles(dir, searchText, excludeFolders, results = []) {
 /* ------------------ API HIT TRACKING ------------------ */
 
 const apiHitCounts = {
-    'GET /findFile': 0,
+    'GET /findFileByName': 0,
+    'GET /findFileByExtension': 0,
     'GET /searchText': 0,
     'GET /readFile': 0
 };
@@ -194,10 +195,10 @@ const server = http.createServer((req, res) => {
         return res.end(JSON.stringify({ apiHitCounts }));
     }
 
-    /* -------- FIND FILE -------- */
-    if (parsedUrl.pathname === '/findFile') {
-        apiHitCounts['GET /findFile']++;
-        const { type, name, excludeFolder } = parsedUrl.query;
+    /* -------- FIND FILE BY NAME -------- */
+    if (parsedUrl.pathname === '/findFileByName') {
+        apiHitCounts['GET /findFileByName']++;
+        const { name, excludeFolder } = parsedUrl.query;
 
         let excludeFolders = [];
         if (excludeFolder) {
@@ -208,18 +209,44 @@ const server = http.createServer((req, res) => {
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
 
+        if (!name) {
+            return res.end(JSON.stringify({
+                error: 'Provide ?name=filename'
+            }));
+        }
+
         try {
-            if (type) {
-                const results = findFilesByExtension(BASE_DIR, type, excludeFolders);
-                return res.end(JSON.stringify({ count: results.length, files: results }));
-            } else if (name) {
-                const results = findFileByExactName(BASE_DIR, name, excludeFolders);
-                return res.end(JSON.stringify({ count: results.length, files: results }));
-            } else {
-                return res.end(JSON.stringify({
-                    error: 'Provide ?type=ext or ?name=filename'
-                }));
-            }
+            const results = findFileByExactName(BASE_DIR, name, excludeFolders);
+            return res.end(JSON.stringify({ count: results.length, files: results }));
+        } catch (err) {
+            res.writeHead(500);
+            return res.end(JSON.stringify({ error: err.message }));
+        }
+    }
+
+    /* -------- FIND FILE BY EXTENSION -------- */
+    if (parsedUrl.pathname === '/findFileByExtension') {
+        apiHitCounts['GET /findFileByExtension']++;
+        const { type, excludeFolder } = parsedUrl.query;
+
+        let excludeFolders = [];
+        if (excludeFolder) {
+            excludeFolders = excludeFolder
+                .split(',')
+                .map(f => f.trim().toLowerCase());
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+
+        if (!type) {
+            return res.end(JSON.stringify({
+                error: 'Provide ?type=ext'
+            }));
+        }
+
+        try {
+            const results = findFilesByExtension(BASE_DIR, type, excludeFolders);
+            return res.end(JSON.stringify({ count: results.length, files: results }));
         } catch (err) {
             res.writeHead(500);
             return res.end(JSON.stringify({ error: err.message }));
@@ -261,7 +288,7 @@ const server = http.createServer((req, res) => {
     }
 
 
-    /* -------- READ FILE (NEW) -------- */
+    /* -------- READ FILE -------- */
     if (parsedUrl.pathname === '/readFile') {
         apiHitCounts['GET /readFile']++;
         const { path: filePath } = parsedUrl.query;

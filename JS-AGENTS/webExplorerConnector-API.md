@@ -1,7 +1,9 @@
 WEB SEARCH API (http://localhost:3031)
 "agentId": "web-explorer"
-GET /search?q=your_query_here
-Performs a web search using DuckDuckGo (HTML endpoint) and returns top 5 results.
+
+
+GET /search?q=web_search_query_here
+Performs a web search with the query passed. Use this when recent online data, official docs or recent event details are needed. e.g. scores, matches details, etc from web.
 
 Query Parameters:
 q (required) → Search query

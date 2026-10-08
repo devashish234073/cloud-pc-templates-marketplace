@@ -5,9 +5,6 @@ Database in use: cloud_pc_templates_agent
 
 All endpoints always return HTTP 200. Errors are indicated by the presence of an "error" field in the response body, never by the HTTP status code.
 
-GET /health
-Returns: {"status":"UP","version":"1.0","type":"agent","service":"SQL Connector","port":3037}
-
 GET /mysql/check
 Checks if the mysql and mysqladmin CLI binaries are installed on the system.
 Returns response like:

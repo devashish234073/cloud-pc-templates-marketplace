@@ -3,12 +3,6 @@
 Base URL: http://localhost:3036
 
 ────────────────────────────────────────
-HEALTH CHECK
-────────────────────────────────────────
-GET http://localhost:3036/health
-Response: { "status": "UP" }
-
-────────────────────────────────────────
 EXECUTE PLAYWRIGHT CODE
 ────────────────────────────────────────
 POST http://localhost:3036/execute

@@ -1,10 +1,10 @@
 FILE EXPLORER API (http://localhost:3030)
 "agentId": "file-explorer"
-GET /health
-Returns: {"status":"UP","baseDir":"/path"}
+This agent does global file search, use this only when you need to search globally
 
 GET /findFile?type=js&excludeFolder=node_modules,dist
 Search by extension. Returns response like: {"count":2,"files":["/path/file1.js","/path/file2.js"]}
+with this set of params it works like findFilesByExtension, use this when need to find all files of particular extnsion from root
 
 GET /findFile?name=package.json&excludeFolder=node_modules
 Search by exact filename. Returns response like: {"count":1,"files":["/path/package.json"]}

@@ -6,7 +6,6 @@
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/health` | Server status + requirement check |
 | GET | `/maven/projects` | List all tracked projects |
 | POST | `/maven/create` | Create Maven project via archetype |
 | POST | `/spring/create` | Create full Spring Boot app |
@@ -40,26 +39,17 @@
 
 ## Endpoints
 
-### `GET /health`
-```json
-{
-  "status": "UP", "version": "4.0", "type": "java-maven-spring-agent",
-  "baseDir": "/path/to/base", "projectCount": 2, "projects": ["my-app", "demo"],
-  "requirements": { "ok": true, "javaVersion": "17.0.2", "javaMajor": 17, "mavenVersion": "3.9.6" }
-}
-```
-
 ---
 
-### `GET /maven/projects`
+GET /maven/projects
 ```json
 { "count": 1, "projects": [{ "name": "my-app", "path": "/base/my-app", "groupId": "com.example", "artifactId": "my-app", "createdAt": "..." }] }
 ```
 
 ---
 
-### `POST /maven/create`
-Create via `mvn archetype:generate`.
+POST /maven/create
+This creates a maven java project via `mvn archetype:generate`.
 ```json
 // Body
 { "groupId": "com.example", "artifactId": "my-app", "version": "1.0-SNAPSHOT",
@@ -67,7 +57,7 @@ Create via `mvn archetype:generate`.
   "archetypeVersion": "1.4", "javaVersion": "17" }
 ```
 
-### `GET /maven/tree?projectName=`
+GET /maven/tree?projectName=
 Nested file/folder tree for one project. Use this to explore the project tree or structure of a java project. Excludes `node_modules`, `target`, dotfiles/dotfolders (`.git`, `.idea`, `.mvn`). Dirs listed before files, alphabetical.
 **Query params:** `projectName`
 ```json
@@ -77,7 +67,7 @@ Node shape: `{name,type:"directory",path,children:[...]}` or `{name,type:"file",
 
 ---
 
-### `POST /spring/create`
+POST /spring/create
 Scaffold a full Spring Boot Maven app. `parent` defaults to `spring-boot-starter-parent:3.3.5` if omitted.
 ```json
 // Body
@@ -86,7 +76,7 @@ Scaffold a full Spring Boot Maven app. `parent` defaults to `spring-boot-starter
   "parent": { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-parent", "version": "3.3.5", "relativePath": "" },
   "properties": { "java.version": "17" },
   "dependencies": [
-    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-web" },
+    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-xyz" },
     { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-test", "scope": "test" }
   ],
   "plugins": [{ "groupId": "org.springframework.boot", "artifactId": "spring-boot-maven-plugin" }],
@@ -96,7 +86,7 @@ Response includes `applicationClass`, `files[]`, and optional `validationWarning
 
 ---
 
-### `POST /spring/crud?projectName=`
+OST /spring/crud?projectName=
 Generate entity, DTOs, repository, service, and controller for one resource.
 ```json
 // Body
@@ -111,7 +101,7 @@ Response includes `endpoints[]` and `files[]` (with `overwritten` flag per file)
 
 ---
 
-### `GET /maven/pom?projectName=&raw=true`
+GET /maven/pom?projectName=&raw=true
 Returns structured POM summary. Add `raw=true` to include full XML.
 ```json
 { "summary": { "groupId": "...", "artifactId": "...", "version": "...", "parent": {}, "properties": {}, "dependencies": [], "plugins": [] }, "rawXml": "..." }
@@ -119,7 +109,7 @@ Returns structured POM summary. Add `raw=true` to include full XML.
 
 ---
 
-### `PUT /maven/properties?projectName=`
+PUT /maven/properties?projectName=
 ```json
 // Body
 { "properties": { "java.version": "21", "spring-cloud.version": "2023.0.3" } }
@@ -127,7 +117,7 @@ Returns structured POM summary. Add `raw=true` to include full XML.
 
 ---
 
-### `PUT /maven/parent?projectName=`
+PUT /maven/parent?projectName=
 ```json
 // Body
 { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-parent", "version": "3.3.5", "relativePath": "" }
@@ -135,7 +125,7 @@ Returns structured POM summary. Add `raw=true` to include full XML.
 
 ---
 
-### `GET /maven/class?projectName=&packageName=&className=` ⭐ NEW
+GET /maven/class?projectName=&packageName=&className=
 Read the full source of a Java class. Use before PATCH to verify current content, or to inspect a generated file.
 
 **Query params:** `projectName` · `packageName` (e.g. `com.example.service`) · `className` (without `.java`)
@@ -149,7 +139,7 @@ Read the full source of a Java class. Use before PATCH to verify current content
 
 ---
 
-### `POST /maven/class?projectName=&packageName=&className=`
+POST /maven/class?projectName=&packageName=&className=
 Create (or overwrite) a Java class.
 ```json
 // Body
@@ -159,12 +149,12 @@ Response includes `classFile`, `overwritten` (bool).
 
 ---
 
-### `PUT /maven/class?projectName=&packageName=&className=`
+PUT /maven/class?projectName=&packageName=&className=
 Same as POST — overwrites the file unconditionally.
 
 ---
 
-### `PATCH /maven/class?projectName=&packageName=&className=`
+PATCH /maven/class?projectName=&packageName=&className=
 Search-and-replace inside an existing class. Each `targetContent` must appear exactly once.
 ```json
 // Body – single replacement
@@ -177,7 +167,7 @@ Response includes `replacementsApplied` count.
 
 ---
 
-### `GET /maven/classes?projectName=&type=main` ⭐ NEW
+GET /maven/classes?projectName=&type=main
 List all Java source files in the project. Use to discover existing classes before creating or patching.
 
 **Query params:** `projectName` · `type` = `main` (default) | `test` | `both`
@@ -198,37 +188,37 @@ List all Java source files in the project. Use to discover existing classes befo
 
 ---
 
-### `POST /maven/dependency?projectName=`
+POST /maven/dependency?projectName=
 ```json
 // Body
-{ "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-web", "version": "3.2.0", "scope": "compile" }
+{ "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-xyz", "version": "3.2.0", "scope": "compile" }
 ```
 Response: `{ "action": "added"|"updated", "groupId", "artifactId", "version" }`
 
 ---
 
-### `POST /maven/dependencies?projectName=`
+POST /maven/dependencies?projectName=
 ```json
 // Body
 { "dependencies": [
-    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-web" },
+    { "groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-xyz" },
     { "groupId": "org.projectlombok", "artifactId": "lombok", "version": "1.18.34", "scope": "provided" }
   ] }
 ```
 
 ---
 
-### `GET /maven/dependencies?projectName=`
+GET /maven/dependencies?projectName=
 Returns `pomDependencies[]` and `resolvedDependencies[]` (from `mvn dependency:list`, may be null if project not yet built).
 
 ---
 
-### `GET /maven/plugins?projectName=`
+GET /maven/plugins?projectName=
 Lists plugins with `groupId`, `artifactId`, `version`, `configurationXml`, `executionsXml`.
 
 ---
 
-### `POST /maven/plugin?projectName=`
+POST /maven/plugin?projectName=
 Add or update a build plugin. Provide `artifactId` (and optional `groupId`, `version`, `configuration`, `executions`) or `rawXml`.
 
 ---
@@ -256,12 +246,12 @@ Runs `mvn package`. Returns 200 even on failure — check `buildSuccess`.
 
 ---
 
-### `GET /maven/jar?projectName=`
+GET /maven/jar?projectName=
 Binary download of built JAR (`Content-Type: application/java-archive`). Build first.
 
 ---
 
-### `GET /maven/artifact?projectName=`
+GET /maven/artifact?projectName=
 JAR metadata without binary download.
 ```json
 { "artifactName": "my-app-1.0-SNAPSHOT.jar", "jarAbsolutePath": "/...", "jarSize": 52428800, "jarSizeKB": 51200 }
@@ -269,12 +259,12 @@ JAR metadata without binary download.
 
 ---
 
-### `GET /maven/project-details?projectName=`
+GET /maven/project-details?projectName=
 Combined snapshot: project info, POM summary, source dir paths, JAR artifact info, last build result, target dir.
 
 ---
 
-### `GET /maven/rescan`
+GET /maven/rescan
 Rescans `basedir` for Maven projects (detects directories with `pom.xml`). Updates the in-memory registry.
 ```json
 { "projectCount": 3, "projects": ["my-app", "demo", "api-service"] }

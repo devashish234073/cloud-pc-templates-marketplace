@@ -3,12 +3,6 @@ Raw Selenium Connector - Agent API Docs
 Base URL: http://localhost:3035
 
 ────────────────────────────────────────
-HEALTH CHECK
-────────────────────────────────────────
-GET http://localhost:3035/health
-Response: { "status": "UP" }
-
-────────────────────────────────────────
 EXECUTE SELENIUM CODE
 ────────────────────────────────────────
 POST http://localhost:3035/execute
