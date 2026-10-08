@@ -6,7 +6,7 @@ Base URL: http://localhost:3036
 EXECUTE PLAYWRIGHT CODE
 ────────────────────────────────────────
 POST http://localhost:3036/execute
-
+This executes arbitrary plawright code passed in the body, use this to visit a website and perform actions like clicking on a button or fetching page title, checking if elements in a webpage is visible or not or checking the content of a webpage
 Content-Type: application/json
 Body: { "code": "<your nodejs playwright code as a string>" }
 

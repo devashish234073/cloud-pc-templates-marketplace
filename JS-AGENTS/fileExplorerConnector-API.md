@@ -2,12 +2,13 @@ FILE EXPLORER API (http://localhost:3030)
 "agentId": "file-explorer"
 This agent does global file search, use this only when you need to search globally
 
-GET /findFile?type=js&excludeFolder=node_modules,dist
-Search by extension. Returns response like: {"count":2,"files":["/path/file1.js","/path/file2.js"]}
-with this set of params it works like findFilesByExtension, use this when need to find all files of particular extnsion from root
+GET /findFileByName?name=<exactFileName>&excludeFolder=<folder1,folder2>
+Find files by exact name. Excludes hidden dirs by default.
+Returns: {"count":2,"files":["/abs/path/file.js"]}
 
-GET /findFile?name=package.json&excludeFolder=node_modules
-Search by exact filename. Returns response like: {"count":1,"files":["/path/package.json"]}
+GET /findFileByExtension?type=<ext>&excludeFolder=<folder1,folder2>
+Find files by extension. Excludes hidden dirs by default.
+Returns: {"count":2,"files":["/abs/path/file.js"]}
 
 GET /searchText?text=hello&excludeFolder=node_modules
 Searches for text inside all readable (non-binary) files recursively. This does Case-insensitive search , to search text with space pass %20 instead of space and this api returns response like: {

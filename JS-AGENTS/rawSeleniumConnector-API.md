@@ -6,7 +6,7 @@ Base URL: http://localhost:3035
 EXECUTE SELENIUM CODE
 ────────────────────────────────────────
 POST http://localhost:3035/execute
-
+This executes arbitrary selenium code passed in the body, use this to visit a website and perform actions like clicking on a button or fetching page title, checking if elements in a webpage is visible or not or checking the content of a webpage
 Content-Type: application/json
 Body: { "code": "<your nodejs selenium code as a string>" }
 
