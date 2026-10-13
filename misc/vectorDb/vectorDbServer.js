@@ -280,7 +280,7 @@ function ollamaInit() {
   if (ollamaInitPromise) return ollamaInitPromise;
 
   ollamaInitPromise = new Promise((resolve, reject) => {
-    console.log(`[init] Running: ollama pull ${EMBED_MODEL}`);
+    console.log(`[init] Running: ollama pull ${EMBED_MODEL}. This may take a few minutes on first run...`);
     execFile('ollama', ['pull', EMBED_MODEL], { timeout: 5 * 60 * 1000 }, (err, stdout, stderr) => {
       if (err) {
         ollamaInitPromise = null; // allow retry on next call
