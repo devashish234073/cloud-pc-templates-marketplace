@@ -94,6 +94,7 @@ function callOllamaChat(body, callback) {
     const payload = JSON.stringify({
         model: body.model,
         messages: body.messages,
+        think: false,
         temperature: body.temperature,
         top_p: body.top_p,
         stream: false
@@ -172,6 +173,7 @@ function callOllamaChatStreaming(body, res) {
     const payload = JSON.stringify({
         model: body.model,
         messages: body.messages,
+        think:false,
         temperature: body.temperature,
         top_p: body.top_p,
         stream: true
