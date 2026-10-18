@@ -24,16 +24,20 @@ if [ ! -d "cloud-pc-templates-marketplace" ]; then
     echo "Step 2: Installing system dependencies..."
     sudo apt-get install -y curl git unzip ca-certificates
 fi
-# Step 3: Install Node.js 20.x (if not already installed)
-echo "Step 3: Checking Node.js installation..."
-if ! command -v node &> /dev/null; then
-    echo "Node.js not found. Installing Node.js 20.x..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+# Step 3: Install the current Node.js LTS version
+echo "Step 3: Checking Node.js LTS installation..."
+
+if ! command -v node &> /dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 24 ]; then
+    echo "Installing Node.js 24.x LTS..."
+    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
     sudo apt-get install -y nodejs
-    echo "Node.js installed successfully"
+    echo "Node.js LTS installed successfully"
 else
     echo "Node.js is already installed: $(node --version)"
 fi
+
+echo "Node version: $(node --version)"
+echo "npm version: $(npm --version)"
 
 # Step 4: Install Angular CLI globally
 echo "Step 4: Installing Angular CLI globally..."
