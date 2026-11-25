@@ -34,6 +34,9 @@ const server = http.createServer((req, res) => {
   // Proxy /v1/models and /v1/chat/completions
   if (pathname === '/v1/models' || pathname === '/v1/chat/completions') {
     proxyRequest(req, res, pathname);
+  } else if (req.method === 'GET' && req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ status: "UP" }));
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not Found' }));
