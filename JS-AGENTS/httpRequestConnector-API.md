@@ -10,7 +10,6 @@ Use this connector when the orchestrator needs to call any HTTP/HTTPS endpoint d
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/health` | Server status |
 | POST | `/request` | Execute a single HTTP request |
 | POST | `/batch` | Execute up to 20 requests sequentially |
 | POST | `/probe` | Reachability check for up to 10 URLs (no body parse, parallel) |
@@ -70,13 +69,13 @@ Sample Response:
 
 POST /batch
 
-Executes up to 20 requests one after another. Useful for a setup sequence (create resource → update it → verify) or for calling multiple endpoints to compare responses.
+Executes up to 20 http requests one after another. Useful for calling multiple endpoints to compare responses.
 
 Sample Payload:
 ```json
 {
   "requests": [
-    { "url": "http://localhost:8080/api/health" },
+    { "url": "http://localhost:8080/api" },
     { "url": "http://localhost:8080/api/products", "method": "POST", "body": { "name": "Widget" } },
     { "url": "http://localhost:8080/api/products/1" }
   ],
@@ -94,17 +93,15 @@ Sample Response:
 {
   "status": 200,
   "message": "Batch completed",
-  "total": 3,
-  "completed": 3,
+  "total": 1,
+  "completed": 1,
   "aborted": false,
   "results": [
     {
       "index": 0,
-      "request": { "url": "http://localhost:8080/api/health", "method": "GET" },
+      "request": { "url": "http://localhost:8080/api", "method": "GET" },
       "response": { "statusCode": 200, "body": { "status": "UP" }, "elapsedMs": 12 }
-    },
-    { "index": 1, "request": { ... }, "response": { "statusCode": 201, ... } },
-    { "index": 2, "request": { ... }, "response": { "statusCode": 200, ... } }
+    }
   ]
 }
 ```
@@ -115,20 +112,20 @@ If a request fails (network error), its result entry has `{ "index": N, "url": "
 
 POST /probe
 
-Fires GET requests to up to 10 URLs in parallel with a short timeout. Does not parse response bodies — only checks reachability and status code. Ideal for polling until a Spring Boot app finishes startup.
+Fires GET requests to up to 10 URLs in parallel with a short timeout. Does not parse response bodies — only checks reachability and status code. Ideal for polling.
 
 Sample Payload:
 ```json
 {
   "urls": [
-    "http://localhost:8080/api/health",
-    "http://localhost:3038/health"
+    "http://localhost:8080/api",
+    "http://localhost:3038"
   ],
   "timeout": 3000
 }
 ```
 
-Single URL shorthand: `{ "url": "http://localhost:8080/api/health" }` also accepted.
+Single URL shorthand: `{ "url": "http://localhost:8080/api" }` also accepted.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
@@ -143,8 +140,8 @@ Sample Response:
   "message": "Probe complete",
   "allReachable": true,
   "results": [
-    { "url": "http://localhost:8080/api/health", "reachable": true,  "statusCode": 200, "elapsedMs": 45 },
-    { "url": "http://localhost:3038/health",      "reachable": true,  "statusCode": 200, "elapsedMs": 8  }
+    { "url": "http://localhost:8080/api", "reachable": true,  "statusCode": 200, "elapsedMs": 45 },
+    { "url": "http://localhost:3038",      "reachable": true,  "statusCode": 200, "elapsedMs": 8  }
   ]
 }
 ```

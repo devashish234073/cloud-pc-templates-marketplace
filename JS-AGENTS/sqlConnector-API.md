@@ -1,6 +1,10 @@
 SQL CONNECTOR API (http://localhost:3037)
 "agentId": "mysql connector"
 All credentials and database name are hardcoded server-side. No credentials or database details are passed in any request.
+const DB_HOST     = 'localhost';
+const DB_PORT     = '3306';
+const DB_USER     = 'devas';
+const DB_PASSWORD = 'devas123';
 Database in use: cloud_pc_templates_agent
 
 All endpoints always return HTTP 200. Errors are indicated by the presence of an "error" field in the response body, never by the HTTP status code.

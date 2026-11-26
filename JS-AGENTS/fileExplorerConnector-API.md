@@ -21,19 +21,6 @@ Searches for text inside all readable (non-binary) files recursively. This does 
         {
           "lineNumber": 12,
           "line": "console.log('hello world');"
-        },
-        {
-          "lineNumber": 45,
-          "line": "// hello comment"
-        }
-      ]
-    },
-    {
-      "file": "/path/README.md",
-      "matches": [
-        {
-          "lineNumber": 3,
-          "line": "hello from documentation"
         }
       ]
     }
