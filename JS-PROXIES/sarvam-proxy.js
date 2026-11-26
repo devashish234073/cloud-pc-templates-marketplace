@@ -22,7 +22,7 @@ const STATIC_MODELS = {
 };
 
 function proxyRequest(path, method, body, callback) {
-    const payload = body ? JSON.stringify(body) : null;
+    const payload = body ? JSON.stringify({ ...body, reasoning_effort: null }) : null;
 
     const options = {
         hostname: SARVAM_HOST,
@@ -65,7 +65,7 @@ function proxyRequest(path, method, body, callback) {
 }
 
 function proxyStreaming(body, clientRes) {
-    const payload = JSON.stringify(body);
+    const payload = JSON.stringify({ ...body, reasoning_effort: null });
 
     const options = {
         hostname: SARVAM_HOST,
