@@ -2,9 +2,6 @@ NODE.JS CONNECTOR API (http://localhost:3041)
 "agentId": "nodejs-connector"
 All endpoints scoped to a project use ?projectName=<name> where name is the project folder name shown in /node/projects.
 
-GET /health
-Returns: {"status":"UP","version":"1.0","type":"nodejs-connector-agent","baseDir":"/path","projectCount":2,"projects":["my-api","utils"],"requirements":{"ok":true,"version":"20.11.0","major":20}}
-
 GET /node/projects
 List all tracked projects.
 Returns: {"count":2,"projects":[{"name":"my-api","type":"api","path":"/abs/path","createdAt":"...","running":false}]}

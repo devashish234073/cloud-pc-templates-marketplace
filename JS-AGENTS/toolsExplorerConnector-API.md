@@ -1,25 +1,16 @@
 ToolsExplorer: This tool provides apis that can be called to get the version of various tools, like java,maven,node,npm,python,etc.
+Base URL: http://localhost:3032
 "agentId": "tools-explorer"
-Health Check
-1. GET http://localhost:3032/health
 
-Response:
-
-{
-  "status": "UP",
-  "service": "Tools Explorer",
-  "port": 3032
-}
-
-GET http://localhost:3032/versions
+GET /versions
 Get All Tool Versions
 
 To Get Specific Tool Version use:
-GET http://localhost:3032/version?tool=java
-GET http://localhost:3032/version?tool=maven
-GET http://localhost:3032/version?tool=node
-GET http://localhost:3032/version?tool=npm
-GET http://localhost:3032/version?tool=python
+GET /version?tool=java
+GET /version?tool=maven
+GET /version?tool=node
+GET /version?tool=npm
+GET /version?tool=python
 Example Response (Installed)
 {
   "tool": "node",
@@ -37,7 +28,7 @@ Example Response (Installed)
   }
 }
 
-GET http://localhost:3032/timer
+GET /timer
 Timer Endpoint
 
 Behavior:
@@ -59,7 +50,7 @@ Example Response (subsequent call)
   "elapsedMs": 2000
 }
 
-GET http://localhost:3032/system-usage
+GET /system-usage
 System Usage
 
 Behavior:
@@ -83,7 +74,7 @@ Example Response:
   "platform": "linux"
 }
 
-GET http://localhost:3032/npm-activity
+GET /npm-activity
 NPM Activity Report
 
 Query Parameters:
@@ -97,9 +88,9 @@ Behavior:
 - Reads global npm packages from the npm prefix's `lib/node_modules` tree for packages touched on that date.
 
 Example Requests:
-GET http://localhost:3032/npm-activity
-GET http://localhost:3032/npm-activity?date=2026-08-04
-GET http://localhost:3032/npm-activity?date=2026-08-04&roots=/home/me,/opt/projects
+GET /npm-activity
+GET /npm-activity?date=2026-08-04
+GET /npm-activity?date=2026-08-04&roots=/home/me,/opt/projects
 
 Example Response:
 {

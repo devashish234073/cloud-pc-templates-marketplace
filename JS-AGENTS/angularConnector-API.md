@@ -12,11 +12,6 @@ Note when creating components make sure to include proper imports needed for cod
 | `[(ngModel)]` | `FormsModule` |
 | `[formControl]` | `ReactiveFormsModule` |
 Every component created gets a separate path in the routes file, info of the same is returned in api response when creating component. Always check logs after  component , creation/update and fix any errors before proceeding.
----
-
-GET /health
-Returns server status, paths, and Angular process PID.
-Response: {"status":"UP","projectDir":"/path/to/project","routesFile":"/path/to/app.routes.ts","logFile":"angular-dev-2026-02-27_10-00-00.log","angularPid":12345}
 
 ---
 

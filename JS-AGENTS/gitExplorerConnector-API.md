@@ -3,9 +3,6 @@ GIT EXPLORER API (http://localhost:3033)
 All repo-scoped responses include: repoName, remoteUrl, currentBranch.
 The "repo" param is always the local folder name (as shown in /git/repos under "folderName").
 
-GET /health
-Returns: {"status":"UP","version":"2.0","type":"git-explorer-agent","baseDir":"/path","repoCount":3,"repos":["repo1","repo2"]}
-
 GET /git/repos
 List all discovered repos with remote URLs and current branches.
 Returns: {"count":2,"repos":[{"folderName":"my-app","repoName":"my-app","remoteUrl":"https://...","currentBranch":"main","path":"/abs/path"}]}
