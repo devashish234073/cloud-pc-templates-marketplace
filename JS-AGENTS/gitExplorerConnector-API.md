@@ -2,13 +2,14 @@ GIT EXPLORER API (http://localhost:3033)
 "agentId": "git-explorer"
 All repo-scoped responses include: repoName, remoteUrl, currentBranch.
 The "repo" param is always the local folder name (as shown in /git/repos under "folderName").
+Use this only when you need to explore a git repo
 
 GET /git/repos
 List all discovered repos with remote URLs and current branches.
 Returns: {"count":2,"repos":[{"folderName":"my-app","repoName":"my-app","remoteUrl":"https://...","currentBranch":"main","path":"/abs/path"}]}
 
 GET /git/rescan
-Re-scan base directory for new/removed repos.
+Re-scan base directory for new/removed git repos.
 Returns: {"message":"Rescanned","repoCount":4,"repos":["repo1","repo2"]}
 
 GET /git/clone?url=<gitUrl>
@@ -16,24 +17,24 @@ Clone a remote repo into the base directory.
 Returns: {"repoName":"my-app","remoteUrl":"https://...","currentBranch":"main","message":"Cloned successfully"}
 
 GET /git/branches?repo=<folderName>
-List local and remote branches.
+List local and remote branches from teh git repo.
 Returns: {"currentBranch":"main","localBranches":["main","dev"],"remoteBranches":["origin/main"]}
 
 POST /git/switch
 Body: {"repo":"my-app","branch":"dev"}
-Checkout a different branch.
+Checkout a different branch from the git repo.
 Returns: {"currentBranch":"dev","message":"Switched to branch \"dev\""}
 
 GET /git/tree?repo=<folderName>
-Full nested file/directory tree (excludes node_modules, dist, build, hidden dirs).
+Full nested file/directory tree (excludes node_modules, dist, build, hidden dirs) of the git repo.
 Returns: {"tree":{"name":"my-app","type":"directory","path":".","children":[{"name":"src","type":"directory","path":"src","children":[{"name":"index.js","type":"file","path":"src/index.js","size":1024,"extension":"js"}]}]}}
 
 GET /git/file?path=<absoluteOrRelativePath>
-Read a single text file's content. Binary files are rejected.
+Read a single text file's content from the git repo. Binary files are rejected.
 Returns: {"filePath":"/abs/path","size":1024,"extension":"js","content":"..."}
 
 GET /git/filesByExtension?repo=<folderName>&ext=<ext1[,ext2]>
-List all files matching given extension(s). Comma-separated for multiple.
+List all files matching given extension(s) from the git repo. Comma-separated for multiple.
 Returns: {"extensions":["js","ts"],"count":42,"files":["/abs/path/file.js"]}
 
 GET /git/remoteUrl?repo=<folderName>
@@ -66,7 +67,7 @@ Batch read multiple files. Accepts absolute or base-relative paths.
 Returns: {"count":2,"files":{"/abs/path1":{"content":"..."},"/abs/path2":{"content":"..."}}}
 
 GET /git/pull?repo=<folderName>
-Pull latest changes from remote for current branch.
+Pull changes from remote for current branch.
 Returns: {"message":"Already up to date."}
 
 POST /git/writeFile

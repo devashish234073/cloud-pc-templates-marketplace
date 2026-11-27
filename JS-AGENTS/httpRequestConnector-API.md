@@ -2,7 +2,7 @@
 "agentId": "http-request-connector"
 **Port:** `3039` | **Base URL:** `http://localhost:3039`
 
-Use this connector when the orchestrator needs to call any HTTP/HTTPS endpoint directly: testing a locally running Spring Boot app, hitting a REST API, polling a health check, or verifying a response without spinning up a full browser. Think of it as `curl` accessible over HTTP.
+Use this connector when the orchestrator needs to call any HTTP/HTTPS endpoint directly, or any GET, POST, etc api:i.e. hitting a REST API without spinning up a full browser. Think of it as `curl` accessible over HTTP to do api calls.
 
 ---
 
@@ -20,7 +20,7 @@ Use this connector when the orchestrator needs to call any HTTP/HTTPS endpoint d
 
 POST /request
 
-The core endpoint. Executes one outbound HTTP or HTTPS request and returns the full response.
+Does one api call and returns the full response. Use this for calling an api or getting response of a url or when testing a localhost api.
 
 Sample Payload:
 ```json

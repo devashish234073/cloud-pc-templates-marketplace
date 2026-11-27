@@ -447,9 +447,9 @@ function buildApiDocChunks(agent, apiDocText) {
     `Agent: ${agent.name || agent.id}`,
     agent.id ? `Agent ID: ${agent.id}` : '',
     agent.description ? `Description: ${agent.description}` : '',
-    agent.port ? `Port: ${agent.port}` : '',
+    agent.port ? `Port: ${agent.port}` : '',/*
     agent.healthCheckUrl ? `Health check: ${agent.healthCheckUrl}` : '',
-    agent.currentVersion ? `Version: ${agent.currentVersion}` : '',
+    agent.currentVersion ? `Version: ${agent.currentVersion}` : '',*/
     '',
     'Available API paths:',
     ...paths.map(({ method, path }) => `- ${method} ${path}`),

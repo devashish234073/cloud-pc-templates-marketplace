@@ -3,7 +3,7 @@ WEB SEARCH API (http://localhost:3031)
 
 
 GET /search?q=web_search_query_here
-Performs a web search with the query passed. Use this when recent online data, official docs or recent event details are needed. e.g. scores, matches details, etc from web. Requests like search web or search online should use this agent.
+Performs a web search with the query passed. Use this when recent online data, latest online data, official docs or recent event details are needed. e.g. scores, matches details, etc from web. Requests like search web or search online should use this agent basically for anything from web.
 
 Query Parameters:
 q (required) → Search query
